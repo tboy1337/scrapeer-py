@@ -1,14 +1,12 @@
-# Scrapeer
+# Scrapeer-py
 
 A tiny Python library that lets you scrape HTTP(S) and UDP trackers for torrent information.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-Scrapeer is a Python port of the original PHP [Scrapeer](https://github.com/torrentpier/scrapeer) library by [TorrentPier](https://github.com/torrentpier).
+Scrapeer-py is a Python port of the original PHP [Scrapeer](https://github.com/torrentpier/scrapeer) library by [TorrentPier](https://github.com/torrentpier).
 
 ## Overview
 
-Scrapeer allows you to retrieve peer information from BitTorrent trackers using both HTTP(S) and UDP protocols. It can fetch seeders, leechers, and completed download counts for multiple torrents from multiple trackers simultaneously.
+Scrapeer-py allows you to retrieve peer information from BitTorrent trackers using both HTTP(S) and UDP protocols. It can fetch seeders, leechers, and completed download counts for multiple torrents from multiple trackers simultaneously.
 
 ## Features
 
