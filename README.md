@@ -22,13 +22,13 @@ Scrapeer allows you to retrieve peer information from BitTorrent trackers using 
 ## Installation
 
 ```bash
-pip install scrapeer
+pip install scrapeer-py
 ```
 
 ## Usage
 
 ```python
-from scrapeer import Scraper
+from scrapeer-py import Scraper
 
 # Initialize the scraper
 scraper = Scraper()
