@@ -18,6 +18,7 @@ setup(
         "torrent",
         "torrents",
         "scraper",
+        "scrapeer",
         "torrent-scraper",
         "torrent-scraping"
     ],
