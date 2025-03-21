@@ -5,7 +5,7 @@ setup(
     version="0.1.0",
     description="Essential Python library that scrapes HTTP(S) and UDP trackers for torrent information.",
     author="Python Port of TorrentPier's Scrapeer",
-    author_email="",
+    author_email="tboy1337@users.noreply.github.com",
     url="https://github.com/tboy1337/scrapeer-py",
     packages=find_packages(),
     classifiers=[
