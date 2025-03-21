@@ -19,7 +19,6 @@ setup(
         "torrents",
         "scraper",
         "torrent-scraper",
-        "torrent-scrap",
         "torrent-scraping"
     ],
     long_description=open("README.md").read(),
