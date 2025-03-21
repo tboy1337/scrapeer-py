@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="scrapeer-py",
-    version="0.1.0",
+    version="1.0.0",
     description="Essential Python library that scrapes HTTP(S) and UDP trackers for torrent information.",
     author="Python Port of TorrentPier's Scrapeer",
     author_email="tboy1337@users.noreply.github.com",
