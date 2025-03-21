@@ -19,7 +19,7 @@ class Scraper:
     The one and only class you'll ever need.
     """
 
-    VERSION = '0.1.0'  # Python port version
+    VERSION = '1.0.0'  # Python port version
 
     def __init__(self):
         """
