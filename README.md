@@ -4,7 +4,7 @@ A tiny Python library that lets you scrape HTTP(S) and UDP trackers for torrent 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Scrapeer is a Python port of the original PHP Scrapeer library by TorrentPier.
+Scrapeer is a Python port of the original PHP [Scrapeer](https://github.com/torrentpier/scrapeer) library by [TorrentPier](https://github.com/torrentpier).
 
 ## Overview
 
@@ -110,4 +110,4 @@ This project is licensed under the MIT License - see the [LICENSE.txt](LICENSE.t
 
 ## Acknowledgments
 
-- Original PHP Scrapeer library by [TorrentPier](https://github.com/torrentpier/scrapeer)
+- Original PHP Scrapeer library by TorrentPier
