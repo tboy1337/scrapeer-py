@@ -110,4 +110,4 @@ This project is licensed under the MIT License - see the [LICENSE.txt](LICENSE.t
 
 ## Acknowledgments
 
-- Original PHP Scrapeer library by TorrentPier
+- Original PHP Scrapeer library by [TorrentPier](https://github.com/torrentpier/scrapeer)
