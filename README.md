@@ -16,6 +16,7 @@ Scrapeer-py allows you to retrieve peer information from BitTorrent trackers usi
 - Optional announce mode for trackers that don't support scrape
 - Configurable timeout settings
 - Detailed error reporting
+- Well-organized modular codebase
 
 ## Installation
 
@@ -26,7 +27,7 @@ pip install scrapeer-py
 ## Usage
 
 ```python
-from scrapeer-py import Scraper
+from scrapeer import Scraper
 
 # Initialize the scraper
 scraper = Scraper()
@@ -63,6 +64,17 @@ if scraper.has_errors():
     for error in scraper.get_errors():
         print(f"  {error}")
 ```
+
+## Package Structure
+
+Scrapeer-py is organized into the following modules:
+
+- `scrapeer/` - Main package directory
+  - `__init__.py` - Package initialization that exports the Scraper class
+  - `scraper.py` - Main Scraper class implementation
+  - `http.py` - HTTP(S) protocol scraping functionality
+  - `udp.py` - UDP protocol scraping functionality
+  - `utils.py` - Utility functions used across the package
 
 ## API Reference
 
