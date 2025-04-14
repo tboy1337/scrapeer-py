@@ -21,7 +21,7 @@ Scrapeer-py allows you to retrieve peer information from BitTorrent trackers usi
 ## Installation
 
 ```bash
-pip install scrapeer-py
+pip install scrapeer
 ```
 
 ## Usage
@@ -117,7 +117,3 @@ Returns all the errors that were logged.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE.txt](LICENSE.txt) file for details.
-
-## Acknowledgments
-
-- Original PHP Scrapeer library by TorrentPier
