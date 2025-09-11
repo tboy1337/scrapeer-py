@@ -2,10 +2,24 @@
 Main Scraper class for Scrapeer.
 """
 
+import logging
 import urllib.parse
+from typing import Dict, List, Union, Optional
+
 from .http import scrape_http
 from .udp import scrape_udp
 from .utils import normalize_infohashes, get_passkey
+
+# Configure logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
 
 class Scraper:
@@ -13,17 +27,26 @@ class Scraper:
     The one and only class you'll ever need.
     """
 
-    VERSION = '1.0.0'  # Python port version
+    VERSION = "1.0.0"  # Python port version
 
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Initialize the scraper.
         """
-        self.errors = []
-        self.infohashes = []
-        self.timeout = 2
+        self.errors: List[str] = []
+        self.infohashes: List[str] = []
+        self.timeout: int = 2
+        logger.debug("Scraper initialized with default timeout of 2 seconds")
 
-    def scrape(self, hashes, trackers, max_trackers=None, timeout=2, announce=False):
+    def scrape(  # pylint: disable=too-many-locals
+        self,
+        hashes: Union[str, List[str]],
+        trackers: Union[str, List[str]],
+        *,
+        max_trackers: Optional[int] = None,
+        timeout: int = 2,
+        announce: bool = False,
+    ) -> Dict[str, Dict[str, int]]:
         """
         Initiates the scraper
 
@@ -35,51 +58,99 @@ class Scraper:
             announce: Optional. Use announce instead of scrape, Default false.
 
         Returns:
-            dict: Dictionary of results.
+            dict: Dictionary of results with infohash as key and stats as value.
+
+        Raises:
+            ValueError: If input validation fails.
+            TypeError: If arguments are of incorrect type.
         """
-        final_result = {}
+        # Input validation
+        if hashes is None:
+            raise ValueError("Hashes cannot be None.")
+
+        if trackers is None:
+            raise ValueError("Trackers cannot be None.")
+
+        if not isinstance(announce, bool):
+            raise TypeError(f"Announce must be boolean, got {type(announce).__name__}.")
+
+        if max_trackers is not None and not isinstance(max_trackers, int):
+            raise TypeError(
+                f"Max_trackers must be integer or None, got {type(max_trackers).__name__}."
+            )
+
+        if max_trackers is not None and max_trackers < 1:
+            raise ValueError(f"Max_trackers must be positive, got {max_trackers}.")
+
+        if not isinstance(timeout, int):
+            raise TypeError(f"Timeout must be integer, got {type(timeout).__name__}.")
+
+        if timeout < 1:
+            raise ValueError(f"Timeout must be positive, got {timeout}.")
+
+        if timeout > 300:  # 5 minutes max
+            raise ValueError(f"Timeout too large, max 300 seconds, got {timeout}.")
+
+        final_result: Dict[str, Dict[str, int]] = {}
 
         if not trackers:
-            self.errors.append('No tracker specified, aborting.')
+            error_msg = "No tracker specified, aborting."
+            logger.error(error_msg)
+            self.errors.append(error_msg)
             return final_result
-        elif not isinstance(trackers, list):
+        if not isinstance(trackers, list):
             trackers = [trackers]
 
-        if isinstance(timeout, int):
-            self.timeout = timeout
-        else:
-            self.timeout = 2
-            self.errors.append('Timeout must be an integer. Using default value.')
+        logger.info(
+            "Starting scrape of %d tracker(s) with %d hash(es)",
+            len(trackers),
+            len(hashes) if isinstance(hashes, list) else 1
+        )
+
+        # Timeout is already validated as int by input validation above
+        self.timeout = timeout
+        logger.debug("Timeout set to %d seconds", timeout)
 
         try:
             self.infohashes = normalize_infohashes(hashes, self.errors)
+            logger.debug("Normalized %d valid infohashes", len(self.infohashes))
         except ValueError as e:
-            self.errors.append(str(e))
+            error_msg = str(e)
+            logger.error("Hash normalization failed: %s", error_msg)
+            self.errors.append(error_msg)
             return final_result
 
-        max_iterations = max_trackers if isinstance(max_trackers, int) else len(trackers)
+        max_iterations = (
+            max_trackers if isinstance(max_trackers, int) else len(trackers)
+        )
         for index, tracker in enumerate(trackers):
             if self.infohashes and index < max_iterations:
                 info = urllib.parse.urlparse(tracker)
                 protocol = info.scheme
-                host = info.netloc.split(':')[0] if ':' in info.netloc else info.netloc
-                
+                host = info.netloc.split(":")[0] if ":" in info.netloc else info.netloc
+
                 if not protocol or not host:
-                    self.errors.append(f'Skipping invalid tracker ({tracker}).')
+                    error_msg = f"Skipping invalid tracker ({tracker})."
+                    logger.warning(error_msg)
+                    self.errors.append(error_msg)
                     continue
 
                 port = info.port if info.port else None
                 path = info.path if info.path else None
                 passkey = get_passkey(path)
-                
-                result = self.try_scrape(protocol, host, port, passkey, announce)
+
+                logger.info("Scraping %s://%s:%s", protocol, host, port or 'default')
+                result = self.try_scrape(protocol, host, port, passkey, announce=announce)
                 final_result.update(result)
+                logger.debug("Got %d results from %s", len(result), host)
                 continue
             break
 
         return final_result
 
-    def try_scrape(self, protocol, host, port, passkey, announce):
+    def try_scrape(
+        self, protocol: str, host: str, port: Optional[int], passkey: str, *, announce: bool = False
+    ) -> Dict[str, Dict[str, int]]:
         """
         Tries to scrape with a single tracker.
 
@@ -96,26 +167,34 @@ class Scraper:
         infohashes = self.infohashes.copy()
         self.infohashes = []
         results = {}
-        
+
         try:
-            if protocol == 'udp':
+            if protocol == "udp":
                 port = port if port else 80
                 results = scrape_udp(infohashes, host, port, announce, self.timeout)
-            elif protocol == 'http':
+            elif protocol == "http":
                 port = port if port else 80
-                results = scrape_http(infohashes, protocol, host, port, passkey, announce, self.timeout)
-            elif protocol == 'https':
+                results = scrape_http(
+                    infohashes, protocol, host, port, passkey,
+                    announce=announce, timeout=self.timeout
+                )
+            elif protocol == "https":
                 port = port if port else 443
-                results = scrape_http(infohashes, protocol, host, port, passkey, announce, self.timeout)
+                results = scrape_http(
+                    infohashes, protocol, host, port, passkey,
+                    announce=announce, timeout=self.timeout
+                )
             else:
-                raise Exception(f'Unsupported protocol ({protocol}://{host}).')
-        except Exception as e:
+                raise ValueError(f"Unsupported protocol ({protocol}://{host}).")
+        except Exception as e:  # pylint: disable=broad-exception-caught
             self.infohashes = infohashes
-            self.errors.append(str(e))
-        
+            error_msg = str(e)
+            logger.error("Scraping failed for %s://%s: %s", protocol, host, error_msg)
+            self.errors.append(error_msg)
+
         return results
 
-    def has_errors(self):
+    def has_errors(self) -> bool:
         """
         Checks if there are any errors.
 
@@ -124,11 +203,11 @@ class Scraper:
         """
         return len(self.errors) > 0
 
-    def get_errors(self):
+    def get_errors(self) -> List[str]:
         """
         Returns all the errors that were logged.
 
         Returns:
             list: All the logged errors.
         """
-        return self.errors 
+        return self.errors

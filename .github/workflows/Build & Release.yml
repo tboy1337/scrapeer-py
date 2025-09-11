@@ -18,14 +18,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.13'
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller
+          pip install -e .
       - name: Build executable
         run: |
-          pyinstaller --onefile scrapeer.py
+          pyinstaller --onefile --name scrapeer scrapeer_cli.py
       - name: Rename executable
         run: |
           Rename-Item -Path dist/scrapeer.exe -NewName scrapeer-py-v1.0.${{ github.run_number }}-windows.exe

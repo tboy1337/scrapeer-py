@@ -7,5 +7,5 @@ Port of the original PHP Scrapeer library by TorrentPier.
 
 from .scraper import Scraper
 
-__version__ = '1.0.0'
-__all__ = ['Scraper'] 
+__version__ = "1.0.0"
+__all__ = ["Scraper"]

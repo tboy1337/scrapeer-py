@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scrapeer"
+version = "1.0.2"
+description = "Essential Python library that scrapes HTTP(S) and UDP trackers for torrent information."
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "tboy1337", email = "obywhuie@anonaddy.com"}
+]
+keywords = [
+    "torrent",
+    "torrents",
+    "scraper",
+    "scrapeer",
+    "torrent-scraper",
+    "torrent-scraping"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.6"
+
+[project.urls]
+Homepage = "https://github.com/tboy1337/scrapeer-py"
+Download = "https://github.com/tboy1337/scrapeer-py/releases/latest"
+Repository = "https://github.com/tboy1337/scrapeer-py"
+
+[project.scripts]
+scrapeer = "scrapeer_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["scrapeer*"]
+
+[tool.setuptools]
+py-modules = ["scrapeer_cli"]

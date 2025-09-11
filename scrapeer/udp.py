@@ -2,42 +2,83 @@
 UDP scraping functionality for Scrapeer.
 """
 
+import logging
+import random
 import socket
 import struct
-import random
+from typing import Dict, List, Tuple
+from dataclasses import dataclass
+
 from .utils import random_peer_id, collect_info_hash
+from .http import validate_network_params
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
-def scrape_udp(infohashes, host, port, announce, timeout):
+def scrape_udp(
+    infohashes: List[str], host: str, port: int, announce: bool, timeout: int
+) -> Dict[str, Dict[str, int]]:
     """
     Initiates the UDP scraping
 
     Args:
-        infohashes: List (>1) or string of infohash(es).
+        infohashes: List of valid 40-character hex infohashes.
         host: Domain or IP address of the tracker.
         port: Port number of the tracker.
-        announce: Optional. Use announce instead of scrape.
+        announce: Use announce instead of scrape.
         timeout: Maximum time for each tracker scrape in seconds.
 
     Returns:
-        dict: Dictionary of results.
+        dict: Dictionary of results with infohash as key.
+
+    Raises:
+        Exception: For network errors, invalid responses, or connection issues.
     """
+    if not infohashes:
+        raise ValueError("Infohashes list cannot be empty.")
+
+    validate_network_params(host, port, timeout)
+    logger.debug("Starting UDP %s for %s:%d", 'announce' if announce else 'scrape', host, port)
+
     socket_obj, ip = prepare_udp(host, port)
     socket_obj.settimeout(timeout)
-    
+
     try:
-        transaction_id, connection_id = udp_connection_request(socket_obj)
+        logger.debug("Establishing UDP connection to %s (%s)", host, ip)
+        transaction_id, _ = udp_connection_request(socket_obj)
         connection_id = udp_connection_response(socket_obj, transaction_id, host, port)
-        
+
         if announce:
-            return udp_announce(socket_obj, infohashes, connection_id)
+            logger.debug("Sending UDP announce for %d hash(es)", len(infohashes))
+            result: Dict[str, Dict[str, int]] = udp_announce(socket_obj, infohashes, connection_id)
         else:
-            return udp_scrape(socket_obj, infohashes, connection_id, transaction_id, host, port)
+            logger.debug("Sending UDP scrape for %d hash(es)", len(infohashes))
+            result = udp_scrape(
+                socket_obj, infohashes, connection_id, transaction_id, host=host, port=port
+            )
+
+        logger.info(
+            "UDP %s successful: %d results from %s",
+            'announce' if announce else 'scrape',
+            len(result),
+            host
+        )
+        return result
+    except Exception as e:
+        logger.error(
+            "UDP %s failed for %s:%d: %s",
+            'announce' if announce else 'scrape',
+            host,
+            port,
+            str(e)
+        )
+        raise
     finally:
         socket_obj.close()
 
 
-def prepare_udp(host, port):
+def prepare_udp(host: str, port: int) -> Tuple[socket.socket, str]:
     """
     Prepares the UDP socket
 
@@ -49,16 +90,16 @@ def prepare_udp(host, port):
         tuple: Tuple containing socket object and IP address.
     """
     socket_obj = udp_create_connection(host, port)
-    
+
     try:
         ip = socket.gethostbyname(host)
-    except socket.gaierror:
-        raise Exception(f"Failed to resolve host '{host}'.")
-    
+    except socket.gaierror as exc:
+        raise ConnectionError(f"Failed to resolve host '{host}'.") from exc
+
     return socket_obj, ip
 
 
-def udp_create_connection(host, port):
+def udp_create_connection(host: str, port: int) -> socket.socket:
     """
     Creates a UDP connection
 
@@ -74,10 +115,10 @@ def udp_create_connection(host, port):
         socket_obj.connect((host, port))
         return socket_obj
     except socket.error as e:
-        raise Exception(f"Failed to create socket for '{host}:{port}' - {str(e)}.")
+        raise ConnectionError(f"Failed to create socket for '{host}:{port}' - {str(e)}.") from e
 
 
-def udp_connection_request(socket_obj):
+def udp_connection_request(socket_obj: socket.socket) -> Tuple[int, int]:
     """
     Sends a connection request
 
@@ -90,18 +131,20 @@ def udp_connection_request(socket_obj):
     connection_id = 0x41727101980  # Default connection ID
     action = 0  # Action (0 = connection, 1 = announce, 2 = scrape)
     transaction_id = random.randint(0, 2147483647)  # Random transaction ID
-    
+
     buffer = struct.pack(">QII", connection_id, action, transaction_id)
-    
+
     try:
         socket_obj.send(buffer)
     except socket.error as e:
-        raise Exception(f"Failed to send connection request - {str(e)}.")
-    
+        raise ConnectionError(f"Failed to send connection request - {str(e)}.") from e
+
     return transaction_id, connection_id
 
 
-def udp_connection_response(socket_obj, transaction_id, host, port):
+def udp_connection_response(
+    socket_obj: socket.socket, transaction_id: int, host: str, port: int
+) -> int:
     """
     Receives a connection response
 
@@ -117,23 +160,38 @@ def udp_connection_response(socket_obj, transaction_id, host, port):
     try:
         response = socket_obj.recv(16)
     except socket.error as e:
-        raise Exception(f"Failed to receive connection response from '{host}:{port}' - {str(e)}.")
-    
+        raise ConnectionError(
+            f"Failed to receive connection response from '{host}:{port}' - {str(e)}."
+        ) from e
+
     if len(response) != 16:
-        raise Exception(f"Invalid response length from '{host}:{port}'.")
-    
-    return_action, return_transaction_id, connection_id = struct.unpack(">IIQ", response)
+        raise ValueError(f"Invalid response length from '{host}:{port}'.")
+
+    return_action: int
+    return_transaction_id: int
+    connection_id: int
+    return_action, return_transaction_id, connection_id = struct.unpack(  # type: ignore[misc]
+        ">IIQ", response
+    )
 
     if return_transaction_id != transaction_id:
-        raise Exception(f"Invalid transaction ID from '{host}:{port}'.")
+        raise ValueError(f"Invalid transaction ID from '{host}:{port}'.")
 
     if return_action != 0:
-        raise Exception(f"Invalid action from '{host}:{port}'.")
-    
+        raise ValueError(f"Invalid action from '{host}:{port}'.")
+
     return connection_id
 
 
-def udp_scrape(socket_obj, hashes, connection_id, transaction_id, host, port):
+def udp_scrape(
+    socket_obj: socket.socket,
+    hashes: List[str],
+    connection_id: int,
+    transaction_id: int,
+    *,
+    host: str,
+    port: int
+) -> Dict[str, Dict[str, int]]:
     """
     Sends a scrape request
 
@@ -149,44 +207,50 @@ def udp_scrape(socket_obj, hashes, connection_id, transaction_id, host, port):
         dict: Dictionary of results.
     """
     action = 2  # Action (2 = scrape)
-    
+
     # Create scrape request
     buffer = udp_scrape_request(socket_obj, hashes, connection_id, transaction_id)
 
     try:
         # Send scrape request
         socket_obj.send(buffer)
-        
+
         # Receive scrape response
         response = socket_obj.recv(8 + (12 * len(hashes)))
-        
+
         # Parse scrape response
         if len(response) < 8:
-            raise Exception(f"Invalid scrape response from '{host}:{port}'.")
-        
-        return_action, return_transaction_id = struct.unpack(">II", response[:8])
-        
+            raise ValueError(f"Invalid scrape response from '{host}:{port}'.")
+
+        return_action: int
+        return_transaction_id: int
+        return_action, return_transaction_id = struct.unpack(
+            ">II", response[:8]
+        )  # type: ignore[misc]
+
         # Verify transaction ID
         if transaction_id != return_transaction_id:
-            raise Exception(f"Invalid transaction ID from '{host}:{port}'.")
-        
+            raise ValueError(f"Invalid transaction ID from '{host}:{port}'.")
+
         # Verify action
         if return_action != action:
-            err_msg = struct.unpack(">I", response[4:8])[0]
-            raise Exception(f"Tracker error, code: {err_msg} from '{host}:{port}'.")
-        
+            err_msg: int = struct.unpack(">I", response[4:8])[0]  # type: ignore[misc]
+            raise RuntimeError(f"Tracker error, code: {err_msg} from '{host}:{port}'.")
+
         # Create keys array
-        keys = []
+        keys: List[str] = []
         for infohash in hashes:
             keys.append(infohash)
-        
+
         # Parse results
-        return udp_scrape_data(response, hashes, host, keys, 8, len(response), 12)
+        return udp_scrape_data(response, hashes, host, keys, start=8, end=len(response), offset=12)
     except socket.error as e:
-        raise Exception(f"Socket error from '{host}:{port}' - {str(e)}.")
+        raise ConnectionError(f"Socket error from '{host}:{port}' - {str(e)}.") from e
 
 
-def udp_scrape_request(socket_obj, hashes, connection_id, transaction_id):
+def udp_scrape_request(
+    socket_obj: socket.socket, hashes: List[str], connection_id: int, transaction_id: int
+) -> bytes:
     """
     Creates a scrape request
 
@@ -200,16 +264,32 @@ def udp_scrape_request(socket_obj, hashes, connection_id, transaction_id):
         bytes: Scrape request.
     """
     action = 2  # Action (2 = scrape)
-    
+
     buffer = struct.pack(">QII", connection_id, action, transaction_id)
-    
+
     for infohash in hashes:
         buffer += collect_info_hash(infohash)
-    
+
     return buffer
 
 
-def udp_announce(socket_obj, hashes, connection_id):
+@dataclass
+class UdpAnnounceParams:
+    """Parameters for UDP announce request."""
+    action: int = 1  # Action (1 = announce)
+    downloaded: int = 0
+    left: int = 0
+    uploaded: int = 0
+    event: int = 0
+    ip: int = 0
+    key: int = 0
+    num_want: int = -1
+    port: int = 6889
+
+
+def udp_announce(
+    socket_obj: socket.socket, hashes: List[str], connection_id: int
+) -> Dict[str, Dict[str, int]]:
     """
     Sends an announce request
 
@@ -222,42 +302,46 @@ def udp_announce(socket_obj, hashes, connection_id):
         dict: Dictionary of results.
     """
     if len(hashes) > 1:
-        raise Exception(f"Too many hashes for UDP announce ({len(hashes)}).")
-    
-    action = 1  # Action (1 = announce)
-    transaction_id = random.randint(0, 2147483647)  # Random transaction ID
-    
+        raise ValueError(f"Too many hashes for UDP announce ({len(hashes)}).")
+
+    transaction_id = random.randint(0, 2147483647)
     infohash = collect_info_hash(hashes[0])
     peer_id = random_peer_id()
-    downloaded = 0
-    left = 0
-    uploaded = 0
-    event = 0
-    ip = 0
-    key = 0
-    num_want = -1
-    port = 6889
-    
-    buffer = struct.pack(">QII20s20sQQQIIIiH",
-                      connection_id, action, transaction_id, infohash, peer_id,
-                      downloaded, left, uploaded, event, ip, key, num_want, port)
-    
+    params = UdpAnnounceParams()
+
+    buffer = struct.pack(
+        ">QII20s20sQQQIIIiH",
+        connection_id,
+        params.action,
+        transaction_id,
+        infohash,
+        peer_id,
+        params.downloaded,
+        params.left,
+        params.uploaded,
+        params.event,
+        params.ip,
+        params.key,
+        params.num_want,
+        params.port,
+    )
+
     try:
         socket_obj.send(buffer)
-        result = udp_verify_announce(socket_obj, transaction_id)
-        
+        result: Tuple[int, int, int] = udp_verify_announce(socket_obj, transaction_id)
+
         return {
             hashes[0]: {
-                'seeders': result[0],
-                'leechers': result[1],
-                'completed': result[2],
+                "seeders": result[0],
+                "leechers": result[1],
+                "completed": result[2],
             }
         }
     except socket.error as e:
-        raise Exception(f"Failed to send announce request - {str(e)}.")
+        raise ConnectionError(f"Failed to send announce request - {str(e)}.") from e
 
 
-def udp_verify_announce(socket_obj, transaction_id):
+def udp_verify_announce(socket_obj: socket.socket, transaction_id: int) -> Tuple[int, int, int]:
     """
     Verifies an announce response
 
@@ -271,23 +355,41 @@ def udp_verify_announce(socket_obj, transaction_id):
     try:
         response = socket_obj.recv(20)
     except socket.error as e:
-        raise Exception(f"Failed to receive announce response - {str(e)}.")
-    
+        raise ConnectionError(f"Failed to receive announce response - {str(e)}.") from e
+
     if len(response) < 20:
-        raise Exception(f"Invalid announce response length ({len(response)}).")
-    
-    return_action, return_transaction_id, interval, leechers, seeders = struct.unpack(">IIIII", response)
-    
+        raise ValueError(f"Invalid announce response length ({len(response)}).")
+
+    return_action: int
+    return_transaction_id: int
+    _: int  # interval
+    leechers: int
+    seeders: int
+    return_action, return_transaction_id, _, leechers, seeders = struct.unpack(
+        ">IIIII", response  # type: ignore[misc]
+    )
+
     if return_transaction_id != transaction_id:
-        raise Exception(f"Invalid transaction ID ({return_transaction_id} != {transaction_id}).")
-    
+        raise ValueError(
+            f"Invalid transaction ID ({return_transaction_id} != {transaction_id})."
+        )
+
     if return_action != 1:
-        raise Exception(f"Invalid action code ({return_action}).")
-    
+        raise ValueError(f"Invalid action code ({return_action}).")
+
     return (seeders, leechers, 0)
 
 
-def udp_scrape_data(response, hashes, host, keys, start, end, offset):
+def udp_scrape_data(
+    response: bytes,
+    hashes: List[str],
+    host: str,
+    keys: List[str],
+    *,
+    start: int,
+    end: int,
+    offset: int
+) -> Dict[str, Dict[str, int]]:
     """
     Parses scrape response
 
@@ -303,25 +405,30 @@ def udp_scrape_data(response, hashes, host, keys, start, end, offset):
     Returns:
         dict: Dictionary of results.
     """
-    results = {}
-    
+    results: Dict[str, Dict[str, int]] = {}
+
     # Check if there is enough data for all hashes
     if (end - start) < (len(hashes) * offset):
-        raise Exception(f"Invalid scrape response from '{host}'.")
-    
+        raise ValueError(f"Invalid scrape response from '{host}'.")
+
     # Parse each hash
-    for i, infohash in enumerate(hashes):
-        pos = start + (i * offset)
-        
+    for i, _ in enumerate(hashes):
+        pos: int = start + (i * offset)
+
         if pos + 12 <= end:
-            seeders, completed, leechers = struct.unpack(">III", response[pos:pos+12])
-            
+            seeders: int
+            completed: int
+            leechers: int
+            seeders, completed, leechers = struct.unpack(  # type: ignore[misc]
+                ">III", response[pos : pos + 12]
+            )
+
             results[keys[i]] = {
-                'seeders': seeders,
-                'completed': completed,
-                'leechers': leechers,
+                "seeders": seeders,
+                "completed": completed,
+                "leechers": leechers,
             }
         else:
-            raise Exception(f"Invalid scrape response from '{host}'.")
-    
-    return results 
+            raise ValueError(f"Invalid scrape response from '{host}'.")
+
+    return results

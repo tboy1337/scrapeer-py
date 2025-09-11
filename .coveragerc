@@ -1,0 +1,124 @@
+[run]
+# Source directories to measure coverage for
+source = scrapeer
+
+# Exclude patterns for files to ignore
+omit = 
+    # Test files
+    tests/*
+    test_*
+    *_test.py
+    # Setup and configuration files
+    setup.py
+    conftest.py
+    # Virtual environment
+    venv/*
+    env/*
+    .venv/*
+    # Build and distribution
+    build/*
+    dist/*
+    *.egg-info/*
+    # Cache directories
+    __pycache__/*
+    .pytest_cache/*
+    # Development tools
+    .tox/*
+
+# Enable branch coverage
+branch = True
+
+# Parallel processing support
+parallel = True
+
+# Data file location
+data_file = .coverage
+
+[report]
+# Reporting precision
+precision = 1
+
+# Show missing line numbers
+show_missing = True
+
+# Skip covered files in report
+skip_covered = False
+
+# Skip empty files
+skip_empty = True
+
+# Sort by coverage percentage
+sort = Cover
+
+# Exclude lines from coverage
+exclude_lines =
+    # Standard pragma
+    pragma: no cover
+    
+    # Don't complain about missing debug-only code
+    def __repr__
+    if self\.debug
+    
+    # Don't complain if tests don't hit defensive assertion code
+    raise AssertionError
+    raise NotImplementedError
+    
+    # Don't complain if non-runnable code isn't run
+    if 0:
+    if False:
+    if __name__ == .__main__.:
+    
+    # Don't complain about abstract methods
+    @(abc\.)?abstractmethod
+    
+    # Don't complain about type checking imports
+    if TYPE_CHECKING:
+    
+    # Don't complain about platform-specific code
+    except ImportError:
+    
+    # Don't complain about logging that may not execute
+    logger\.debug
+    logger\.trace
+
+# Partial branches to exclude
+partial_branches =
+    # Standard pragma
+    pragma: no branch
+    
+    # Don't complain if non-runnable code isn't run
+    if 0:
+    if False:
+
+# Fail under this coverage percentage
+fail_under = 85
+
+[html]
+# Directory for HTML output
+directory = htmlcov
+
+# Title for HTML report
+title = Scrapeer Python Coverage Report
+
+# Show contexts in HTML report (requires --cov-context in pytest)
+show_contexts = False
+
+# Skip files with 100% coverage in HTML report
+skip_covered = False
+
+# Skip empty files in HTML report  
+skip_empty = True
+
+[xml]
+# XML output file
+output = coverage.xml
+
+[json]
+# JSON output file
+output = coverage.json
+
+# Pretty print JSON
+pretty_print = True
+
+# Show contexts in JSON (requires --cov-context in pytest)
+show_contexts = False
