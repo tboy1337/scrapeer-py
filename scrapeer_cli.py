@@ -57,7 +57,7 @@ def main() -> None:  # pylint: disable=too-many-locals
     parser.add_argument(
         "--version",
         action="version",
-        version="Scrapeer-py 1.0.0"
+        version="Scrapeer-py 1.0.3"
     )
 
     args = parser.parse_args()

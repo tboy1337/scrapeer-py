@@ -500,7 +500,7 @@ class TestCliIntegration:
         )
 
         assert result.returncode == 0
-        assert "Scrapeer-py 1.0.0" in result.stdout
+        assert "Scrapeer-py 1.0.3" in result.stdout
 
     @pytest.mark.timeout(10)
     def test_cli_missing_required_args(self) -> None:
