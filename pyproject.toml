@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scrapeer"
-version = "1.0.3"
+version = "1.0.11"
 description = "Essential Python library that scrapes HTTP(S) and UDP trackers for torrent information."
 readme = "README.md"
 license = {text = "MIT"}
