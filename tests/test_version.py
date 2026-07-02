@@ -4,8 +4,6 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from scrapeer._version import _fallback_version, _pyproject_path, get_version
 
 

@@ -16,6 +16,43 @@ from .utils import collect_info_hash, random_peer_id
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class UdpTrackerEndpoint:
+    """UDP tracker host and port."""
+
+    host: str
+    port: int
+
+
+@dataclass(frozen=True)
+class UdpResponseSlice:
+    """Byte range parameters for parsing a UDP scrape response."""
+
+    start: int
+    end: int
+    offset: int
+
+
+@dataclass
+class UdpTransferStats:
+    """Transfer counters for a UDP announce request."""
+
+    downloaded: int = 0
+    left: int = 0
+    uploaded: int = 0
+
+
+@dataclass
+class UdpAnnounceOptions:
+    """Optional fields for a UDP announce request."""
+
+    event: int = 0
+    ip: int = 0
+    key: int = 0
+    num_want: int = -1
+    port: int = 6889
+
+
 def scrape_udp(
     infohashes: List[str], host: str, port: int, announce: bool, timeout: int
 ) -> Dict[str, Dict[str, int]]:
@@ -45,11 +82,14 @@ def scrape_udp(
 
     socket_obj, ip = prepare_udp(host, port)
     socket_obj.settimeout(timeout)
+    endpoint = UdpTrackerEndpoint(host=host, port=port)
 
     try:
         logger.debug("Establishing UDP connection to %s (%s)", host, ip)
         transaction_id, _ = udp_connection_request(socket_obj)
-        connection_id = udp_connection_response(socket_obj, transaction_id, host, port)
+        connection_id = udp_connection_response(
+            socket_obj, transaction_id, endpoint.host, endpoint.port
+        )
 
         if announce:
             logger.debug("Sending UDP announce for %d hash(es)", len(infohashes))
@@ -59,12 +99,7 @@ def scrape_udp(
         else:
             logger.debug("Sending UDP scrape for %d hash(es)", len(infohashes))
             result = udp_scrape(
-                socket_obj,
-                infohashes,
-                connection_id,
-                transaction_id,
-                host=host,
-                port=port,
+                socket_obj, infohashes, connection_id, transaction_id, endpoint
             )
 
         logger.info(
@@ -199,9 +234,7 @@ def udp_scrape(
     hashes: List[str],
     connection_id: int,
     transaction_id: int,
-    *,
-    host: str,
-    port: int,
+    endpoint: UdpTrackerEndpoint,
 ) -> Dict[str, Dict[str, int]]:
     """
     Sends a scrape request
@@ -211,27 +244,23 @@ def udp_scrape(
         hashes: List (>1) or string of infohash(es).
         connection_id: Connection ID.
         transaction_id: Transaction ID.
-        host: Domain or IP address of the tracker.
-        port: Port number of the tracker.
+        endpoint: Tracker host and port.
 
     Returns:
         dict: Dictionary of results.
     """
     action = 2  # Action (2 = scrape)
 
-    # Create scrape request
     buffer = udp_scrape_request(socket_obj, hashes, connection_id, transaction_id)
 
     try:
-        # Send scrape request
         socket_obj.send(buffer)
-
-        # Receive scrape response
         response = socket_obj.recv(8 + (12 * len(hashes)))
 
-        # Parse scrape response
         if len(response) < 8:
-            raise ValueError(f"Invalid scrape response from '{host}:{port}'.")
+            raise ValueError(
+                f"Invalid scrape response from '{endpoint.host}:{endpoint.port}'."
+            )
 
         return_action: int
         return_transaction_id: int
@@ -239,26 +268,25 @@ def udp_scrape(
             ">II", response[:8]
         )  # type: ignore[misc]
 
-        # Verify transaction ID
         if transaction_id != return_transaction_id:
-            raise ValueError(f"Invalid transaction ID from '{host}:{port}'.")
+            raise ValueError(
+                f"Invalid transaction ID from '{endpoint.host}:{endpoint.port}'."
+            )
 
-        # Verify action
         if return_action != action:
             err_msg: int = struct.unpack(">I", response[4:8])[0]  # type: ignore[misc]
-            raise RuntimeError(f"Tracker error, code: {err_msg} from '{host}:{port}'.")
+            raise RuntimeError(
+                f"Tracker error, code: {err_msg} from "
+                f"'{endpoint.host}:{endpoint.port}'."
+            )
 
-        # Create keys array
-        keys: List[str] = []
-        for infohash in hashes:
-            keys.append(infohash)
-
-        # Parse results
-        return udp_scrape_data(
-            response, hashes, host, keys, start=8, end=len(response), offset=12
-        )
+        keys = list(hashes)
+        response_slice = UdpResponseSlice(start=8, end=len(response), offset=12)
+        return udp_scrape_data(response, hashes, endpoint.host, keys, response_slice)
     except socket.error as e:
-        raise ConnectionError(f"Socket error from '{host}:{port}' - {str(e)}.") from e
+        raise ConnectionError(
+            f"Socket error from '{endpoint.host}:{endpoint.port}' - {str(e)}."
+        ) from e
 
 
 def udp_scrape_request(
@@ -289,21 +317,6 @@ def udp_scrape_request(
     return buffer
 
 
-@dataclass
-class UdpAnnounceParams:
-    """Parameters for UDP announce request."""
-
-    action: int = 1  # Action (1 = announce)
-    downloaded: int = 0
-    left: int = 0
-    uploaded: int = 0
-    event: int = 0
-    ip: int = 0
-    key: int = 0
-    num_want: int = -1
-    port: int = 6889
-
-
 def udp_announce(
     socket_obj: socket.socket, hashes: List[str], connection_id: int
 ) -> Dict[str, Dict[str, int]]:
@@ -324,23 +337,25 @@ def udp_announce(
     transaction_id = random.randint(0, 2147483647)
     infohash = collect_info_hash(hashes[0])
     peer_id = random_peer_id()
-    params = UdpAnnounceParams()
+    action = 1  # Action (1 = announce)
+    transfer = UdpTransferStats()
+    options = UdpAnnounceOptions()
 
     buffer = struct.pack(
         ">QII20s20sQQQIIIiH",
         connection_id,
-        params.action,
+        action,
         transaction_id,
         infohash,
         peer_id,
-        params.downloaded,
-        params.left,
-        params.uploaded,
-        params.event,
-        params.ip,
-        params.key,
-        params.num_want,
-        params.port,
+        transfer.downloaded,
+        transfer.left,
+        transfer.uploaded,
+        options.event,
+        options.ip,
+        options.key,
+        options.num_want,
+        options.port,
     )
 
     try:
@@ -404,10 +419,7 @@ def udp_scrape_data(
     hashes: List[str],
     host: str,
     keys: List[str],
-    *,
-    start: int,
-    end: int,
-    offset: int,
+    response_slice: UdpResponseSlice,
 ) -> Dict[str, Dict[str, int]]:
     """
     Parses scrape response
@@ -417,20 +429,19 @@ def udp_scrape_data(
         hashes: List (>1) or string of infohash(es).
         host: Domain or IP address of the tracker.
         keys: List of infohash keys.
-        start: Start position in the response.
-        end: End position in the response.
-        offset: Offset for each result.
+        response_slice: Start, end, and offset for parsing.
 
     Returns:
         dict: Dictionary of results.
     """
     results: Dict[str, Dict[str, int]] = {}
+    start = response_slice.start
+    end = response_slice.end
+    offset = response_slice.offset
 
-    # Check if there is enough data for all hashes
     if (end - start) < (len(hashes) * offset):
         raise ValueError(f"Invalid scrape response from '{host}'.")
 
-    # Parse each hash
     for i, _ in enumerate(hashes):
         pos: int = start + (i * offset)
         seeders: int

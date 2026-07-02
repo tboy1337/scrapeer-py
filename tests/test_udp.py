@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from scrapeer.udp import (
+    UdpResponseSlice,
+    UdpTrackerEndpoint,
     prepare_udp,
     scrape_udp,
     udp_announce,
@@ -50,7 +52,11 @@ class TestScrapeUdp:
         mock_conn_req.assert_called_once_with(mock_socket)
         mock_conn_resp.assert_called_once_with(mock_socket, 12345, "example.com", 80)
         mock_scrape.assert_called_once_with(
-            mock_socket, ["hash1"], 0x41727101980, 12345, host="example.com", port=80
+            mock_socket,
+            ["hash1"],
+            0x41727101980,
+            12345,
+            UdpTrackerEndpoint(host="example.com", port=80),
         )
         mock_socket.close.assert_called_once()
         assert result == {"hash1": {"seeders": 1, "completed": 2, "leechers": 3}}
@@ -278,8 +284,7 @@ class TestUdpScrape:
             ["a1b2c3d4e5f6789012345678901234567890abcd"],
             0x41727101999,
             12345,
-            host="example.com",
-            port=80,
+            UdpTrackerEndpoint(host="example.com", port=80),
         )
 
         mock_scrape_request.assert_called_once_with(
@@ -308,8 +313,7 @@ class TestUdpScrape:
                     ["a1b2c3d4e5f6789012345678901234567890abcd"],
                     0x41727101999,
                     12345,
-                    host="example.com",
-                    port=80,
+                    UdpTrackerEndpoint(host="example.com", port=80),
                 )
 
     def test_invalid_transaction_id(self) -> None:
@@ -331,8 +335,7 @@ class TestUdpScrape:
                     ["a1b2c3d4e5f6789012345678901234567890abcd"],
                     0x41727101999,
                     12345,
-                    host="example.com",
-                    port=80,
+                    UdpTrackerEndpoint(host="example.com", port=80),
                 )
 
     def test_error_response(self) -> None:
@@ -354,8 +357,7 @@ class TestUdpScrape:
                     ["a1b2c3d4e5f6789012345678901234567890abcd"],
                     0x41727101999,
                     12345,
-                    host="example.com",
-                    port=80,
+                    UdpTrackerEndpoint(host="example.com", port=80),
                 )
 
     def test_socket_error(self) -> None:
@@ -374,8 +376,7 @@ class TestUdpScrape:
                     ["a1b2c3d4e5f6789012345678901234567890abcd"],
                     0x41727101999,
                     12345,
-                    host="example.com",
-                    port=80,
+                    UdpTrackerEndpoint(host="example.com", port=80),
                 )
 
 
@@ -542,7 +543,11 @@ class TestUdpScrapeData:
         keys = ["hash1", "hash2"]
 
         result = udp_scrape_data(
-            response, hashes, "example.com", keys, start=8, end=len(response), offset=12
+            response,
+            hashes,
+            "example.com",
+            keys,
+            UdpResponseSlice(start=8, end=len(response), offset=12),
         )
 
         expected = {
@@ -568,9 +573,7 @@ class TestUdpScrapeData:
                 hashes,
                 "example.com",
                 keys,
-                start=8,
-                end=len(response),
-                offset=12,
+                UdpResponseSlice(start=8, end=len(response), offset=12),
             )
 
     def test_partial_data(self) -> None:
@@ -590,9 +593,7 @@ class TestUdpScrapeData:
                 hashes,
                 "example.com",
                 keys,
-                start=8,
-                end=len(response),
-                offset=12,
+                UdpResponseSlice(start=8, end=len(response), offset=12),
             )
 
     def test_insufficient_data_for_single_hash(self) -> None:
@@ -612,9 +613,7 @@ class TestUdpScrapeData:
                 hashes,
                 "example.com",
                 keys,
-                start=8,
-                end=len(response),
-                offset=12,
+                UdpResponseSlice(start=8, end=len(response), offset=12),
             )
 
     def test_udp_scrape_data_insufficient_response(self) -> None:
@@ -635,9 +634,7 @@ class TestUdpScrapeData:
                 hashes,
                 "example.com",
                 keys,
-                start=8,
-                end=len(response),
-                offset=12,
+                UdpResponseSlice(start=8, end=len(response), offset=12),
             )
 
 
@@ -663,7 +660,5 @@ class TestScrapeUdpValidation:
                 hashes,
                 "example.com",
                 keys,
-                start=0,
-                end=len(response),
-                offset=12,
+                UdpResponseSlice(start=0, end=len(response), offset=12),
             )

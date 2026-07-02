@@ -5,11 +5,12 @@ from unittest.mock import patch
 import pytest
 
 from scrapeer._version import get_version
+from scrapeer.http import HttpTrackerEndpoint
 from scrapeer.scraper import Scraper
 
 
-class TestScraper:  # pylint: disable=too-many-public-methods
-    """Tests for Scraper class."""
+class TestScraperInit:
+    """Tests for Scraper initialization and error accessors."""
 
     def test_init(self) -> None:
         """Test scraper initialization."""
@@ -38,6 +39,10 @@ class TestScraper:  # pylint: disable=too-many-public-methods
 
         errors = scraper.get_errors()
         assert errors == ["Error 1", "Error 2"]
+
+
+class TestScraperScrape:
+    """Tests for Scraper.scrape basic paths."""
 
     def test_scrape_no_trackers(self) -> None:
         """Test scrape with no trackers."""
@@ -121,7 +126,6 @@ class TestScraper:  # pylint: disable=too-many-public-methods
 
                 _ = scraper.scrape([valid_hash], trackers, max_trackers=2)
 
-                # Should only call try_scrape twice
                 assert mock_try_scrape.call_count == 2
 
     def test_scrape_invalid_tracker_url(self) -> None:
@@ -182,6 +186,10 @@ class TestScraper:  # pylint: disable=too-many-public-methods
                         announce=False,
                     )
 
+
+class TestScraperTryScrape:
+    """Tests for Scraper.try_scrape protocol handling."""
+
     def test_try_scrape_udp(self) -> None:
         """Test try_scrape with UDP protocol."""
         scraper = Scraper()
@@ -225,10 +233,12 @@ class TestScraper:  # pylint: disable=too-many-public-methods
 
             mock_scrape_http.assert_called_once_with(
                 ["hash1"],
-                "http",
-                "example.com",
-                80,
-                "/passkey",
+                HttpTrackerEndpoint(
+                    protocol="http",
+                    host="example.com",
+                    port=80,
+                    passkey="/passkey",
+                ),
                 announce=False,
                 timeout=2,
             )
@@ -248,10 +258,12 @@ class TestScraper:  # pylint: disable=too-many-public-methods
 
             mock_scrape_http.assert_called_once_with(
                 ["hash1"],
-                "https",
-                "example.com",
-                443,
-                "/passkey",
+                HttpTrackerEndpoint(
+                    protocol="https",
+                    host="example.com",
+                    port=443,
+                    passkey="/passkey",
+                ),
                 announce=True,
                 timeout=2,
             )
@@ -265,7 +277,7 @@ class TestScraper:  # pylint: disable=too-many-public-methods
         result = scraper.try_scrape("ftp", "example.com", 21, "", announce=False)
 
         assert not result
-        assert scraper.infohashes == ["hash1"]  # Should be restored on error
+        assert scraper.infohashes == ["hash1"]
         assert "Unsupported protocol (ftp://example.com)." in scraper.errors
 
     def test_try_scrape_exception_handling(self) -> None:
@@ -279,7 +291,7 @@ class TestScraper:  # pylint: disable=too-many-public-methods
             result = scraper.try_scrape("udp", "example.com", 80, "", announce=False)
 
             assert not result
-            assert scraper.infohashes == ["hash1"]  # Should be restored on error
+            assert scraper.infohashes == ["hash1"]
             assert "Connection failed" in scraper.errors
 
     def test_infohashes_backup_and_restore(self) -> None:
@@ -293,8 +305,11 @@ class TestScraper:  # pylint: disable=too-many-public-methods
 
             _ = scraper.try_scrape("udp", "example.com", 80, "", announce=False)
 
-            # Should restore original hashes on error
             assert scraper.infohashes == original_hashes
+
+
+class TestScraperIntegration:
+    """Tests for Scraper integration and iteration behavior."""
 
     def test_scrape_integration_flow(self) -> None:
         """Test complete scrape integration flow."""
@@ -344,7 +359,6 @@ class TestScraper:  # pylint: disable=too-many-public-methods
             with patch("scrapeer.scraper.get_passkey") as mock_passkey:
                 mock_passkey.return_value = ""
                 with patch("scrapeer.scraper.scrape_udp") as mock_scrape_udp:
-                    # First tracker returns results for both hashes
                     mock_scrape_udp.return_value = {
                         valid_hash1: {"seeders": 10, "completed": 5, "leechers": 3},
                         valid_hash2: {"seeders": 20, "completed": 15, "leechers": 8},
@@ -360,7 +374,6 @@ class TestScraper:  # pylint: disable=too-many-public-methods
                         valid_hash2: {"seeders": 20, "completed": 15, "leechers": 8},
                     }
                     assert result == expected
-                    # Only first tracker should be called since all hashes are found
                     assert mock_scrape_udp.call_count == 1
 
     def test_scrape_no_infohashes_after_normalization(self) -> None:
@@ -373,7 +386,6 @@ class TestScraper:  # pylint: disable=too-many-public-methods
 
             result = scraper.scrape(["invalid_hash"], ["udp://tracker.com"])
 
-            # Should not attempt to scrape if no valid hashes
             assert not result
 
     def test_scrape_empty_infohashes_stops_iteration(self) -> None:
@@ -384,7 +396,7 @@ class TestScraper:  # pylint: disable=too-many-public-methods
         with patch("scrapeer.scraper.normalize_infohashes") as mock_normalize:
             mock_normalize.return_value = [valid_hash]
             with patch.object(scraper, "try_scrape") as mock_try_scrape:
-                # First call empties infohashes, second call shouldn't happen
+
                 def side_effect(*args, **kwargs):
                     scraper.infohashes = []
                     return {valid_hash: {"seeders": 1}}
@@ -395,21 +407,18 @@ class TestScraper:  # pylint: disable=too-many-public-methods
                     [valid_hash], ["udp://tracker1.com", "udp://tracker2.com"]
                 )
 
-                # Should only call try_scrape once
                 assert mock_try_scrape.call_count == 1
 
     def test_scraper_break_on_empty_infohashes(self) -> None:
-        """Test scraper break statement when infohashes becomes empty after first tracker."""
+        """Test scraper break when infohashes becomes empty after first tracker."""
         scraper = Scraper()
 
-        # Set up a scenario where infohashes becomes empty after first tracker
         with patch("scrapeer.scraper.normalize_infohashes") as mock_normalize:
             mock_normalize.return_value = ["a1b2c3d4e5f6789012345678901234567890abcd"]
 
             with patch.object(scraper, "try_scrape") as mock_try_scrape:
 
                 def side_effect(*args, **kwargs):
-                    # First call empties the infohashes list
                     scraper.infohashes = []
                     return {"a1b2c3d4e5f6789012345678901234567890abcd": {"seeders": 1}}
 
@@ -417,11 +426,36 @@ class TestScraper:  # pylint: disable=too-many-public-methods
 
                 _ = scraper.scrape(
                     ["a1b2c3d4e5f6789012345678901234567890abcd"],
-                    ["http://tracker1.com", "http://tracker2.com"],  # Two trackers
+                    ["http://tracker1.com", "http://tracker2.com"],
                 )
 
-                # Should only call try_scrape once before breaking
                 assert mock_try_scrape.call_count == 1
+
+    def test_scraper_break_on_max_trackers_reached(self) -> None:
+        """Test scraper break when index >= max_iterations."""
+        scraper = Scraper()
+
+        with patch("scrapeer.scraper.normalize_infohashes") as mock_normalize:
+            mock_normalize.return_value = ["a1b2c3d4e5f6789012345678901234567890abcd"]
+
+            with patch.object(scraper, "try_scrape") as mock_try_scrape:
+                mock_try_scrape.return_value = {}
+
+                _ = scraper.scrape(
+                    ["a1b2c3d4e5f6789012345678901234567890abcd"],
+                    [
+                        "http://tracker1.com",
+                        "http://tracker2.com",
+                        "http://tracker3.com",
+                    ],
+                    max_trackers=1,
+                )
+
+                assert mock_try_scrape.call_count == 1
+
+
+class TestScraperValidation:
+    """Tests for Scraper.scrape input validation."""
 
     def test_validation_none_hashes(self) -> None:
         """Test validation error for None hashes."""
@@ -504,26 +538,3 @@ class TestScraper:  # pylint: disable=too-many-public-methods
                 ["http://example.com"],
                 timeout=301,
             )
-
-    def test_scraper_break_on_max_trackers_reached(self) -> None:
-        """Test scraper break statement when index >= max_iterations."""
-        scraper = Scraper()
-
-        with patch("scrapeer.scraper.normalize_infohashes") as mock_normalize:
-            mock_normalize.return_value = ["a1b2c3d4e5f6789012345678901234567890abcd"]
-
-            with patch.object(scraper, "try_scrape") as mock_try_scrape:
-                mock_try_scrape.return_value = {}
-
-                _ = scraper.scrape(
-                    ["a1b2c3d4e5f6789012345678901234567890abcd"],
-                    [
-                        "http://tracker1.com",
-                        "http://tracker2.com",
-                        "http://tracker3.com",
-                    ],
-                    max_trackers=1,  # Limit to 1 tracker
-                )
-
-                # Should only call try_scrape once due to max_trackers limit
-                assert mock_try_scrape.call_count == 1

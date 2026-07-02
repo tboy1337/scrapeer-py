@@ -7,12 +7,27 @@ import re
 import socket
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
+from re import Match
 from typing import Dict, List, Optional
 
 from .config import get_user_agent
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+_PATTERN_ALL = r"d8:completei(\d+)e10:downloadedi(\d+)e10:incompletei(\d+)e"
+_PATTERN_SINGLE = r"d8:completei(\d+)e10:incompletei(\d+)e"
+
+
+@dataclass(frozen=True)
+class HttpTrackerEndpoint:
+    """HTTP(S) tracker connection parameters."""
+
+    protocol: str
+    host: str
+    port: int
+    passkey: str = ""
 
 
 def validate_network_params(host: str, port: int, timeout: int) -> None:
@@ -39,10 +54,7 @@ def validate_network_params(host: str, port: int, timeout: int) -> None:
 
 def scrape_http(
     infohashes: List[str],
-    protocol: str,
-    host: str,
-    port: int,
-    passkey: str,
+    endpoint: HttpTrackerEndpoint,
     *,
     announce: bool = False,
     timeout: int = 2,
@@ -52,10 +64,7 @@ def scrape_http(
 
     Args:
         infohashes: List of valid 40-character hex infohashes.
-        protocol: Protocol to use for the scraping ("http" or "https").
-        host: Domain or IP address of the tracker.
-        port: Port number of the tracker.
-        passkey: Passkey provided in the scrape request (can be empty).
+        endpoint: Tracker protocol, host, port, and passkey.
         announce: Use announce instead of scrape.
         timeout: Maximum time for each tracker scrape in seconds.
 
@@ -68,50 +77,52 @@ def scrape_http(
     if not infohashes:
         raise ValueError("Infohashes list cannot be empty.")
 
-    if protocol not in ("http", "https"):
-        raise ValueError(f"Invalid protocol '{protocol}', must be 'http' or 'https'.")
+    if endpoint.protocol not in ("http", "https"):
+        raise ValueError(
+            f"Invalid protocol '{endpoint.protocol}', must be 'http' or 'https'."
+        )
 
-    validate_network_params(host, port, timeout)
+    validate_network_params(endpoint.host, endpoint.port, timeout)
     logger.debug(
-        "Starting HTTP%s scrape for %s", "S" if protocol == "https" else "", host
+        "Starting HTTP%s scrape for %s",
+        "S" if endpoint.protocol == "https" else "",
+        endpoint.host,
     )
 
     try:
         if announce:
             logger.debug("Using announce method for %d hash(es)", len(infohashes))
-            response = http_announce(
-                infohashes, protocol, host, port, passkey, timeout=timeout
-            )
+            response = http_announce(infohashes, endpoint, timeout=timeout)
         else:
             logger.debug("Using scrape method for %d hash(es)", len(infohashes))
-            query = http_query(infohashes, protocol, host, port, passkey)
-            response = http_request(query, host, port, timeout)
+            query = http_query(infohashes, endpoint)
+            response = http_request(query, endpoint.host, endpoint.port, timeout)
 
-        results = http_data(response, infohashes, host)
-        logger.info("HTTP scrape successful: %d results from %s", len(results), host)
+        results = http_data(response, infohashes, endpoint.host)
+        logger.info(
+            "HTTP scrape successful: %d results from %s", len(results), endpoint.host
+        )
         return results
     except Exception as e:
-        logger.error("HTTP scrape failed for %s: %s", host, str(e))
+        logger.error("HTTP scrape failed for %s: %s", endpoint.host, str(e))
         raise
 
 
-def http_query(
-    infohashes: List[str], protocol: str, host: str, port: int, passkey: str
-) -> str:
+def http_query(infohashes: List[str], endpoint: HttpTrackerEndpoint) -> str:
     """
     Builds the HTTP(S) query
 
     Args:
         infohashes: List (>1) or string of infohash(es).
-        protocol: Protocol to use for the scraping.
-        host: Domain or IP address of the tracker.
-        port: Port number of the tracker.
-        passkey: Optional. Passkey provided in the scrape request.
+        endpoint: Tracker protocol, host, port, and passkey.
 
     Returns:
         str: Fully qualified URL.
     """
-    info = urllib.parse.urlparse(f"{protocol}://{host}:{port}/scrape{passkey}")
+    info = urllib.parse.urlparse(
+        f"{endpoint.protocol}://{endpoint.host}:{endpoint.port}"
+        f"/scrape{endpoint.passkey}"
+    )
     query = f"{info.scheme}://{info.netloc}{info.path}"
 
     if len(infohashes) > 1:
@@ -156,10 +167,7 @@ def http_request(query: str, host: str, port: int, timeout: int) -> bytes:
 
 def http_announce(
     infohashes: List[str],
-    protocol: str,
-    host: str,
-    port: int,
-    passkey: str,
+    endpoint: HttpTrackerEndpoint,
     *,
     timeout: int = 2,
 ) -> bytes:
@@ -168,16 +176,16 @@ def http_announce(
 
     Args:
         infohashes: List (>1) or string of infohash(es).
-        protocol: Protocol to use for the scraping.
-        host: Domain or IP address of the tracker.
-        port: Port number of the tracker.
-        passkey: Optional. Passkey provided in the scrape request.
+        endpoint: Tracker protocol, host, port, and passkey.
         timeout: Maximum time for each tracker scrape in seconds.
 
     Returns:
         str: Response from the tracker.
     """
-    info = urllib.parse.urlparse(f"{protocol}://{host}:{port}/announce{passkey}")
+    info = urllib.parse.urlparse(
+        f"{endpoint.protocol}://{endpoint.host}:{endpoint.port}"
+        f"/announce{endpoint.passkey}"
+    )
     query = f"{info.scheme}://{info.netloc}{info.path}"
 
     if len(infohashes) > 1:
@@ -201,10 +209,86 @@ def http_announce(
             response: bytes = urlfile.read()  # type: ignore[misc]
         return response
     except Exception as e:
-        raise ConnectionError(f"Connection error: {host}:{port} - {str(e)}") from e
+        raise ConnectionError(
+            f"Connection error: {endpoint.host}:{endpoint.port} - {str(e)}"
+        ) from e
 
 
-def http_data(  # pylint: disable=too-many-locals
+def _decode_tracker_response(response: bytes) -> str:
+    """Decode tracker response bytes to a string."""
+    try:
+        return response.decode("utf-8")
+    except UnicodeDecodeError:
+        return response.decode("latin-1", errors="replace")
+
+
+def _stats_from_all_pattern(matches: Match[str]) -> Dict[str, int]:
+    """Build stats dict from the full scrape regex match."""
+    return {
+        "seeders": int(matches.group(1)),
+        "completed": int(matches.group(2)),
+        "leechers": int(matches.group(3)),
+    }
+
+
+def _stats_from_single_pattern(matches: Match[str]) -> Dict[str, int]:
+    """Build stats dict from the single-hash scrape regex match."""
+    return {
+        "seeders": int(matches.group(1)),
+        "completed": 0,
+        "leechers": int(matches.group(2)),
+    }
+
+
+def _parse_hash_direct(data: str, infohash: str) -> Optional[Dict[str, int]]:
+    """Parse per-hash stats using direct regex patterns."""
+    pattern = f"{infohash}:{_PATTERN_ALL}"
+    matches = re.search(pattern, data, re.IGNORECASE)
+    if matches:
+        return _stats_from_all_pattern(matches)
+
+    pattern = f"{infohash}:{_PATTERN_SINGLE}"
+    matches = re.search(pattern, data, re.IGNORECASE)
+    if matches:
+        return _stats_from_single_pattern(matches)
+
+    return None
+
+
+def _parse_hash_from_files_section(
+    data: str, infohash: str, host: str
+) -> Dict[str, int]:
+    """Parse per-hash stats from the d5:filesd section fallback."""
+    info = get_information(data, "d5:filesd", "ee")
+    if not info:
+        raise ValueError(f"Invalid scrape response from '{host}'.")
+
+    try:
+        infohash_bytes = bytes.fromhex(infohash).decode("latin-1", errors="ignore")
+    except ValueError:
+        infohash_bytes = infohash
+
+    pattern = f"20:{infohash_bytes}d"
+    start = info.find(pattern)
+    if start == -1:
+        raise ValueError(f"Failed to parse torrent data from '{host}'.")
+
+    section = info[start:]
+    end = section.find("e")
+    section = section[: end + 1]
+
+    seeders_match = re.search(r"completei(\d+)e", section, re.IGNORECASE)
+    leechers_match = re.search(r"incompletei(\d+)e", section, re.IGNORECASE)
+    completed_match = re.search(r"downloadedi(\d+)e", section, re.IGNORECASE)
+
+    return {
+        "seeders": int(seeders_match.group(1)) if seeders_match else 0,
+        "leechers": int(leechers_match.group(1)) if leechers_match else 0,
+        "completed": int(completed_match.group(1)) if completed_match else 0,
+    }
+
+
+def http_data(
     response: bytes, infohashes: List[str], host: str
 ) -> Dict[str, Dict[str, int]]:
     """
@@ -218,78 +302,15 @@ def http_data(  # pylint: disable=too-many-locals
     Returns:
         dict: Dictionary of results.
     """
-    # Convert bytes to string, handling encoding issues
-    try:
-        data = response.decode("utf-8")
-    except UnicodeDecodeError:
-        data = response.decode("latin-1", errors="replace")
+    data = _decode_tracker_response(response)
     results: Dict[str, Dict[str, int]] = {}
-    pattern_all = r"d8:completei(\d+)e10:downloadedi(\d+)e10:incompletei(\d+)e"
-    pattern_single = r"d8:completei(\d+)e10:incompletei(\d+)e"
 
     for infohash in infohashes:
-        pattern = f"{infohash}:{pattern_all}"
-        matches = re.search(pattern, data, re.IGNORECASE)
-
-        if matches:
-            results[infohash] = {
-                "seeders": int(matches.group(1)),
-                "completed": int(matches.group(2)),
-                "leechers": int(matches.group(3)),
-            }
-        else:
-            pattern = f"{infohash}:{pattern_single}"
-            matches = re.search(pattern, data, re.IGNORECASE)
-
-            if matches:
-                results[infohash] = {
-                    "seeders": int(matches.group(1)),
-                    "completed": 0,
-                    "leechers": int(matches.group(2)),
-                }
-            else:
-                info = get_information(data, "d5:filesd", "ee")
-
-                if info:
-                    try:
-                        infohash_bytes = bytes.fromhex(infohash).decode(
-                            "latin-1", errors="ignore"
-                        )
-                    except ValueError:
-                        infohash_bytes = infohash
-                    pattern = f"20:{infohash_bytes}d"
-                    start = info.find(pattern)
-
-                    if start != -1:
-                        info = info[start:]
-                        end = info.find("e")
-                        info = info[: end + 1]
-
-                        seeders_match = re.search(
-                            r"completei(\d+)e", info, re.IGNORECASE
-                        )
-                        leechers_match = re.search(
-                            r"incompletei(\d+)e", info, re.IGNORECASE
-                        )
-                        completed_match = re.search(
-                            r"downloadedi(\d+)e", info, re.IGNORECASE
-                        )
-
-                        seeders = int(seeders_match.group(1)) if seeders_match else 0
-                        leechers = int(leechers_match.group(1)) if leechers_match else 0
-                        completed = (
-                            int(completed_match.group(1)) if completed_match else 0
-                        )
-
-                        results[infohash] = {
-                            "seeders": seeders,
-                            "completed": completed,
-                            "leechers": leechers,
-                        }
-                    else:
-                        raise ValueError(f"Failed to parse torrent data from '{host}'.")
-                else:
-                    raise ValueError(f"Invalid scrape response from '{host}'.")
+        direct = _parse_hash_direct(data, infohash)
+        if direct is not None:
+            results[infohash] = direct
+            continue
+        results[infohash] = _parse_hash_from_files_section(data, infohash, host)
 
     return results
 

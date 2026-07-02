@@ -9,6 +9,7 @@ import pytest
 
 from scrapeer.config import get_user_agent
 from scrapeer.http import (
+    HttpTrackerEndpoint,
     get_information,
     http_announce,
     http_data,
@@ -34,16 +35,15 @@ class TestScrapeHttp:
 
             result = scrape_http(
                 ["hash1"],
-                "http",
-                "example.com",
-                80,
-                "/passkey",
+                HttpTrackerEndpoint("http", "example.com", 80, "/passkey"),
                 announce=True,
                 timeout=5,
             )
 
             mock_announce.assert_called_once_with(
-                ["hash1"], "http", "example.com", 80, "/passkey", timeout=5
+                ["hash1"],
+                HttpTrackerEndpoint("http", "example.com", 80, "/passkey"),
+                timeout=5,
             )
             mock_http_data.assert_called_once_with(
                 b"fake_response", ["hash1"], "example.com"
@@ -66,16 +66,13 @@ class TestScrapeHttp:
 
             result = scrape_http(
                 ["hash1"],
-                "http",
-                "example.com",
-                80,
-                "/passkey",
+                HttpTrackerEndpoint("http", "example.com", 80, "/passkey"),
                 announce=False,
                 timeout=5,
             )
 
             mock_query.assert_called_once_with(
-                ["hash1"], "http", "example.com", 80, "/passkey"
+                ["hash1"], HttpTrackerEndpoint("http", "example.com", 80, "/passkey")
             )
             mock_request.assert_called_once_with(
                 "http://example.com/scrape?info_hash=test", "example.com", 80, 5
@@ -100,10 +97,7 @@ class TestScrapeHttp:
             with pytest.raises(Exception, match="Data parsing failed"):
                 scrape_http(
                     ["hash1"],
-                    "http",
-                    "example.com",
-                    80,
-                    "/passkey",
+                    HttpTrackerEndpoint("http", "example.com", 80, "/passkey"),
                     announce=False,
                     timeout=5,
                 )
@@ -116,10 +110,7 @@ class TestHttpQuery:
         """Test query building with single hash."""
         result = http_query(
             ["a1b2c3d4e5f6789012345678901234567890abcd"],
-            "http",
-            "example.com",
-            80,
-            "/passkey",
+            HttpTrackerEndpoint("http", "example.com", 80, "/passkey"),
         )
         expected = (
             "http://example.com:80/scrape/passkey?info_hash="
@@ -133,7 +124,9 @@ class TestHttpQuery:
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "b1c2d3e4f5678901234567890123456789abcdef",
         ]
-        result = http_query(hashes, "https", "tracker.com", 443, "/key123")
+        result = http_query(
+            hashes, HttpTrackerEndpoint("https", "tracker.com", 443, "/key123")
+        )
 
         assert result.startswith("https://tracker.com:443/scrape/key123?info_hash=")
         assert "&info_hash=" in result
@@ -141,7 +134,8 @@ class TestHttpQuery:
     def test_no_passkey(self) -> None:
         """Test query building without passkey."""
         result = http_query(
-            ["a1b2c3d4e5f6789012345678901234567890abcd"], "http", "example.com", 80, ""
+            ["a1b2c3d4e5f6789012345678901234567890abcd"],
+            HttpTrackerEndpoint("http", "example.com", 80),
         )
         expected = (
             "http://example.com:80/scrape?info_hash="
@@ -151,7 +145,7 @@ class TestHttpQuery:
 
     def test_empty_hash_list(self) -> None:
         """Test with empty hash list."""
-        result = http_query([], "http", "example.com", 80, "")
+        result = http_query([], HttpTrackerEndpoint("http", "example.com", 80))
         assert result == "http://example.com:80/scrape"
 
 
@@ -240,10 +234,7 @@ class TestHttpAnnounce:
 
         result = http_announce(
             ["a1b2c3d4e5f6789012345678901234567890abcd"],
-            "http",
-            "example.com",
-            80,
-            "/passkey",
+            HttpTrackerEndpoint("http", "example.com", 80, "/passkey"),
             timeout=5,
         )
 
@@ -257,7 +248,11 @@ class TestHttpAnnounce:
         with pytest.raises(
             Exception, match="Too many hashes for HTTP announce \\(2\\)"
         ):
-            http_announce(hashes, "http", "example.com", 80, "/passkey", timeout=5)
+            http_announce(
+                hashes,
+                HttpTrackerEndpoint("http", "example.com", 80, "/passkey"),
+                timeout=5,
+            )
 
     @patch("socket.setdefaulttimeout")
     @patch("urllib.request.urlopen")
@@ -273,10 +268,7 @@ class TestHttpAnnounce:
 
         http_announce(
             ["a1b2c3d4e5f6789012345678901234567890abcd"],
-            "https",
-            "tracker.com",
-            443,
-            "/key",
+            HttpTrackerEndpoint("https", "tracker.com", 443, "/key"),
             timeout=10,
         )
 
@@ -307,10 +299,7 @@ class TestHttpAnnounce:
         ):
             http_announce(
                 ["a1b2c3d4e5f6789012345678901234567890abcd"],
-                "http",
-                "example.com",
-                80,
-                "/passkey",
+                HttpTrackerEndpoint("http", "example.com", 80, "/passkey"),
                 timeout=5,
             )
 
@@ -503,7 +492,9 @@ class TestScrapeHttpValidation:
     def test_empty_infohashes(self) -> None:
         """Test with empty infohashes list."""
         with pytest.raises(ValueError, match="Infohashes list cannot be empty"):
-            scrape_http([], "http", "example.com", 80, "", announce=False)
+            scrape_http(
+                [], HttpTrackerEndpoint("http", "example.com", 80), announce=False
+            )
 
     def test_invalid_protocol(self) -> None:
         """Test with invalid protocol."""
@@ -512,10 +503,7 @@ class TestScrapeHttpValidation:
         ):
             scrape_http(
                 ["a1b2c3d4e5f6789012345678901234567890abcd"],
-                "ftp",
-                "example.com",
-                80,
-                "",
+                HttpTrackerEndpoint("ftp", "example.com", 80),
                 announce=False,
             )
 
