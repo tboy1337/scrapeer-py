@@ -11,8 +11,7 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-_CHECK_DIRS: tuple[str, ...] = ("scrapeer", "tests", "scripts")
-_ROOT_PY_FILES: tuple[str, ...] = ("scrapeer_cli.py",)
+_CHECK_DIRS: tuple[str, ...] = ("src/scrapeer", "tests", "scripts")
 _VERIFY_SCRIPT = Path("scripts") / "verify.py"
 
 
@@ -38,7 +37,7 @@ def _run_step(name: str, args: Sequence[str], *, cwd: Path | None = None) -> Non
 
 
 def _format_paths() -> list[str]:
-    return [*list(_CHECK_DIRS), *_ROOT_PY_FILES]
+    return list(_CHECK_DIRS)
 
 
 def _autopep8_args(*, fix: bool) -> list[str]:
@@ -79,8 +78,7 @@ def main() -> None:
             "mypy",
             _python_m(
                 "mypy",
-                "scrapeer",
-                "scrapeer_cli.py",
+                "src/scrapeer",
                 "tests",
                 verify_script,
                 str(root / "scripts" / "generate_file_version_info.py"),
@@ -90,8 +88,7 @@ def main() -> None:
             "pylint (package)",
             _python_m(
                 "pylint",
-                "scrapeer",
-                "scrapeer_cli.py",
+                "src/scrapeer",
                 f"--output={pylint_report}",
             ),
         ),
@@ -108,8 +105,7 @@ def main() -> None:
             _python_m(
                 "bandit",
                 "-r",
-                "scrapeer",
-                "scrapeer_cli.py",
+                "src/scrapeer",
                 "-q",
                 "-c",
                 "pyproject.toml",

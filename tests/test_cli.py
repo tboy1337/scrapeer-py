@@ -1,15 +1,21 @@
-"""Tests for scrapeer_cli module."""
+"""Tests for scrapeer.cli module."""
 
 import json
+import os
+import runpy
 import subprocess
 import sys
 from io import StringIO
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-import scrapeer_cli
+from scrapeer import cli
 from scrapeer._version import get_version
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_SUBPROCESS_ENV = {**os.environ, "PYTHONPATH": str(_REPO_ROOT / "src")}
 
 
 class TestCliMain:
@@ -18,7 +24,7 @@ class TestCliMain:
     def test_main_with_valid_args_human_readable(self) -> None:
         """Test main function with valid arguments and human-readable output."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -36,9 +42,9 @@ class TestCliMain:
         mock_scraper.get_errors.return_value = []
 
         with patch("sys.argv", test_args):
-            with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
+            with patch("scrapeer.cli.Scraper", return_value=mock_scraper):
                 with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                    scrapeer_cli.main()  # Should not raise SystemExit on success
+                    cli.main()  # Should not raise SystemExit on success
 
                     output = mock_stdout.getvalue()
                     assert "Results:" in output
@@ -51,7 +57,7 @@ class TestCliMain:
     def test_main_with_json_output(self) -> None:
         """Test main function with JSON output."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -70,9 +76,9 @@ class TestCliMain:
         mock_scraper.get_errors.return_value = []
 
         with patch("sys.argv", test_args):
-            with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
+            with patch("scrapeer.cli.Scraper", return_value=mock_scraper):
                 with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
-                    scrapeer_cli.main()  # Should not raise SystemExit on success
+                    cli.main()  # Should not raise SystemExit on success
 
                     output = mock_stdout.getvalue()
                     result = json.loads(output)
@@ -88,7 +94,7 @@ class TestCliMain:
     def test_main_with_errors(self) -> None:
         """Test main function when scraper returns errors."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -103,10 +109,10 @@ class TestCliMain:
         ]
 
         with patch("sys.argv", test_args):
-            with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
+            with patch("scrapeer.cli.Scraper", return_value=mock_scraper):
                 with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
                     with pytest.raises(SystemExit) as exc_info:
-                        scrapeer_cli.main()
+                        cli.main()
 
                     assert exc_info.value.code == 1  # Should exit with error code
                     output = mock_stdout.getvalue()
@@ -118,7 +124,7 @@ class TestCliMain:
     def test_main_with_quiet_mode_errors(self) -> None:
         """Test main function with errors in quiet mode."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -131,10 +137,10 @@ class TestCliMain:
         mock_scraper.get_errors.return_value = ["Connection timeout"]
 
         with patch("sys.argv", test_args):
-            with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
+            with patch("scrapeer.cli.Scraper", return_value=mock_scraper):
                 with patch("sys.stdout", new_callable=StringIO) as mock_stdout:
                     with pytest.raises(SystemExit) as exc_info:
-                        scrapeer_cli.main()
+                        cli.main()
 
                     assert exc_info.value.code == 1
                     output = mock_stdout.getvalue()
@@ -146,7 +152,7 @@ class TestCliMain:
     def test_main_keyboard_interrupt(self) -> None:
         """Test main function handles keyboard interrupt."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -156,10 +162,10 @@ class TestCliMain:
         mock_scraper.scrape.side_effect = KeyboardInterrupt()
 
         with patch("sys.argv", test_args):
-            with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
+            with patch("scrapeer.cli.Scraper", return_value=mock_scraper):
                 with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                     with pytest.raises(SystemExit) as exc_info:
-                        scrapeer_cli.main()
+                        cli.main()
 
                     assert (
                         exc_info.value.code == 130
@@ -170,7 +176,7 @@ class TestCliMain:
     def test_main_keyboard_interrupt_quiet(self) -> None:
         """Test main function handles keyboard interrupt in quiet mode."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -181,10 +187,10 @@ class TestCliMain:
         mock_scraper.scrape.side_effect = KeyboardInterrupt()
 
         with patch("sys.argv", test_args):
-            with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
+            with patch("scrapeer.cli.Scraper", return_value=mock_scraper):
                 with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                     with pytest.raises(SystemExit) as exc_info:
-                        scrapeer_cli.main()
+                        cli.main()
 
                     assert exc_info.value.code == 130
                     output = mock_stderr.getvalue()
@@ -193,7 +199,7 @@ class TestCliMain:
     def test_main_with_exception(self) -> None:
         """Test main function handles general exceptions."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -203,10 +209,10 @@ class TestCliMain:
         mock_scraper.scrape.side_effect = Exception("Test error")
 
         with patch("sys.argv", test_args):
-            with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
+            with patch("scrapeer.cli.Scraper", return_value=mock_scraper):
                 with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                     with pytest.raises(SystemExit) as exc_info:
-                        scrapeer_cli.main()
+                        cli.main()
 
                     assert exc_info.value.code == 1
                     output = mock_stderr.getvalue()
@@ -215,7 +221,7 @@ class TestCliMain:
     def test_main_with_exception_quiet(self) -> None:
         """Test main function handles exceptions in quiet mode."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -226,10 +232,10 @@ class TestCliMain:
         mock_scraper.scrape.side_effect = Exception("Test error")
 
         with patch("sys.argv", test_args):
-            with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
+            with patch("scrapeer.cli.Scraper", return_value=mock_scraper):
                 with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                     with pytest.raises(SystemExit) as exc_info:
-                        scrapeer_cli.main()
+                        cli.main()
 
                     assert exc_info.value.code == 1
                     output = mock_stderr.getvalue()
@@ -242,7 +248,7 @@ class TestCliValidation:
     def test_invalid_infohash_too_short(self) -> None:
         """Test validation of infohash that's too short."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "abc123",  # Too short
             "-t",
             "udp://tracker.example.com:80",
@@ -251,7 +257,7 @@ class TestCliValidation:
         with patch("sys.argv", test_args):
             with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                 with pytest.raises(SystemExit) as exc_info:
-                    scrapeer_cli.main()
+                    cli.main()
 
                 assert exc_info.value.code == 1
                 output = mock_stderr.getvalue()
@@ -261,7 +267,7 @@ class TestCliValidation:
     def test_invalid_infohash_too_long(self) -> None:
         """Test validation of infohash that's too long."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcdef",  # Too long (41 chars)
             "-t",
             "udp://tracker.example.com:80",
@@ -270,7 +276,7 @@ class TestCliValidation:
         with patch("sys.argv", test_args):
             with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                 with pytest.raises(SystemExit) as exc_info:
-                    scrapeer_cli.main()
+                    cli.main()
 
                 assert exc_info.value.code == 1
                 output = mock_stderr.getvalue()
@@ -279,7 +285,7 @@ class TestCliValidation:
     def test_invalid_infohash_bad_characters(self) -> None:
         """Test validation of infohash with invalid characters."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "g1h2i3j4k5l6789012345678901234567890abcd",  # Contains g,h,i,j,k,l
             "-t",
             "udp://tracker.example.com:80",
@@ -288,7 +294,7 @@ class TestCliValidation:
         with patch("sys.argv", test_args):
             with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                 with pytest.raises(SystemExit) as exc_info:
-                    scrapeer_cli.main()
+                    cli.main()
 
                 assert exc_info.value.code == 1
                 output = mock_stderr.getvalue()
@@ -297,7 +303,7 @@ class TestCliValidation:
     def test_invalid_infohash_quiet_mode(self) -> None:
         """Test invalid infohash validation in quiet mode."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "invalid",
             "-t",
             "udp://tracker.example.com:80",
@@ -307,7 +313,7 @@ class TestCliValidation:
         with patch("sys.argv", test_args):
             with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                 with pytest.raises(SystemExit) as exc_info:
-                    scrapeer_cli.main()
+                    cli.main()
 
                 assert exc_info.value.code == 1
                 output = mock_stderr.getvalue()
@@ -316,7 +322,7 @@ class TestCliValidation:
     def test_timeout_too_low(self) -> None:
         """Test validation of timeout that's too low."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -327,7 +333,7 @@ class TestCliValidation:
         with patch("sys.argv", test_args):
             with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                 with pytest.raises(SystemExit) as exc_info:
-                    scrapeer_cli.main()
+                    cli.main()
 
                 assert exc_info.value.code == 1
                 output = mock_stderr.getvalue()
@@ -336,7 +342,7 @@ class TestCliValidation:
     def test_timeout_too_high(self) -> None:
         """Test validation of timeout that's too high."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -347,7 +353,7 @@ class TestCliValidation:
         with patch("sys.argv", test_args):
             with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                 with pytest.raises(SystemExit) as exc_info:
-                    scrapeer_cli.main()
+                    cli.main()
 
                 assert exc_info.value.code == 1
                 output = mock_stderr.getvalue()
@@ -356,7 +362,7 @@ class TestCliValidation:
     def test_timeout_validation_quiet_mode(self) -> None:
         """Test timeout validation in quiet mode."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -368,7 +374,7 @@ class TestCliValidation:
         with patch("sys.argv", test_args):
             with patch("sys.stderr", new_callable=StringIO) as mock_stderr:
                 with pytest.raises(SystemExit) as exc_info:
-                    scrapeer_cli.main()
+                    cli.main()
 
                 assert exc_info.value.code == 1
                 output = mock_stderr.getvalue()
@@ -381,7 +387,7 @@ class TestCliArguments:
     def test_multiple_infohashes(self) -> None:
         """Test CLI with multiple infohashes."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "b2c3d4e5f6789012345678901234567890abcdef",
             "-t",
@@ -393,9 +399,9 @@ class TestCliArguments:
         mock_scraper.has_errors.return_value = False
 
         with patch("sys.argv", test_args):
-            with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
+            with patch("scrapeer.cli.Scraper", return_value=mock_scraper):
                 with patch("sys.stdout", new_callable=StringIO):
-                    scrapeer_cli.main()  # Should not raise SystemExit on success
+                    cli.main()  # Should not raise SystemExit on success
 
                 # Verify scraper was called with correct arguments
                 mock_scraper.scrape.assert_called_once()
@@ -413,7 +419,7 @@ class TestCliArguments:
     def test_multiple_trackers(self) -> None:
         """Test CLI with multiple trackers."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker1.example.com:80",
@@ -425,9 +431,9 @@ class TestCliArguments:
         mock_scraper.has_errors.return_value = False
 
         with patch("sys.argv", test_args):
-            with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
+            with patch("scrapeer.cli.Scraper", return_value=mock_scraper):
                 with patch("sys.stdout", new_callable=StringIO):
-                    scrapeer_cli.main()  # Should not raise SystemExit on success
+                    cli.main()  # Should not raise SystemExit on success
 
                 # Verify scraper was called with correct trackers
                 call_args = mock_scraper.scrape.call_args
@@ -438,7 +444,7 @@ class TestCliArguments:
     def test_announce_mode(self) -> None:
         """Test CLI with announce mode enabled."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -450,9 +456,9 @@ class TestCliArguments:
         mock_scraper.has_errors.return_value = False
 
         with patch("sys.argv", test_args):
-            with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
+            with patch("scrapeer.cli.Scraper", return_value=mock_scraper):
                 with patch("sys.stdout", new_callable=StringIO):
-                    scrapeer_cli.main()  # Should not raise SystemExit on success
+                    cli.main()  # Should not raise SystemExit on success
 
                 # Verify announce=True was passed
                 call_args = mock_scraper.scrape.call_args
@@ -461,7 +467,7 @@ class TestCliArguments:
     def test_max_trackers_option(self) -> None:
         """Test CLI with max trackers option."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -474,9 +480,9 @@ class TestCliArguments:
         mock_scraper.has_errors.return_value = False
 
         with patch("sys.argv", test_args):
-            with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
+            with patch("scrapeer.cli.Scraper", return_value=mock_scraper):
                 with patch("sys.stdout", new_callable=StringIO):
-                    scrapeer_cli.main()  # Should not raise SystemExit on success
+                    cli.main()  # Should not raise SystemExit on success
 
                 # Verify max_trackers=5 was passed
                 call_args = mock_scraper.scrape.call_args
@@ -485,7 +491,7 @@ class TestCliArguments:
     def test_custom_timeout(self) -> None:
         """Test CLI with custom timeout."""
         test_args = [
-            "scrapeer_cli.py",
+            "scrapeer",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "-t",
             "udp://tracker.example.com:80",
@@ -498,9 +504,9 @@ class TestCliArguments:
         mock_scraper.has_errors.return_value = False
 
         with patch("sys.argv", test_args):
-            with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
+            with patch("scrapeer.cli.Scraper", return_value=mock_scraper):
                 with patch("sys.stdout", new_callable=StringIO):
-                    scrapeer_cli.main()  # Should not raise SystemExit on success
+                    cli.main()  # Should not raise SystemExit on success
 
                 # Verify timeout=10 was passed
                 call_args = mock_scraper.scrape.call_args
@@ -510,15 +516,23 @@ class TestCliArguments:
 class TestCliIntegration:
     """Integration tests for the CLI module."""
 
+    def test_main_module_entry_point(self) -> None:
+        """Test python -m scrapeer executes the CLI main function."""
+        with patch("scrapeer.cli.main") as mock_main:
+            runpy.run_module("scrapeer", run_name="__main__")
+            mock_main.assert_called_once()
+
     @pytest.mark.timeout(10)
     def test_cli_help_option(self) -> None:
         """Test CLI help option works."""
         result = subprocess.run(
-            [sys.executable, "scrapeer_cli.py", "--help"],
+            [sys.executable, "-m", "scrapeer", "--help"],
             capture_output=True,
             text=True,
             timeout=5,
             check=False,
+            env=_SUBPROCESS_ENV,
+            cwd=_REPO_ROOT,
         )
 
         assert result.returncode == 0
@@ -532,11 +546,13 @@ class TestCliIntegration:
     def test_cli_version_option(self) -> None:
         """Test CLI version option works."""
         result = subprocess.run(
-            [sys.executable, "scrapeer_cli.py", "--version"],
+            [sys.executable, "-m", "scrapeer", "--version"],
             capture_output=True,
             text=True,
             timeout=5,
             check=False,
+            env=_SUBPROCESS_ENV,
+            cwd=_REPO_ROOT,
         )
 
         assert result.returncode == 0
@@ -546,11 +562,13 @@ class TestCliIntegration:
     def test_cli_missing_required_args(self) -> None:
         """Test CLI with missing required arguments."""
         result = subprocess.run(
-            [sys.executable, "scrapeer_cli.py"],
+            [sys.executable, "-m", "scrapeer"],
             capture_output=True,
             text=True,
             timeout=5,
             check=False,
+            env=_SUBPROCESS_ENV,
+            cwd=_REPO_ROOT,
         )
 
         assert result.returncode == 2  # argparse error code
@@ -562,13 +580,16 @@ class TestCliIntegration:
         result = subprocess.run(
             [
                 sys.executable,
-                "scrapeer_cli.py",
+                "-m",
+                "scrapeer",
                 "a1b2c3d4e5f6789012345678901234567890abcd",
             ],
             capture_output=True,
             text=True,
             timeout=5,
             check=False,
+            env=_SUBPROCESS_ENV,
+            cwd=_REPO_ROOT,
         )
 
         assert result.returncode == 2

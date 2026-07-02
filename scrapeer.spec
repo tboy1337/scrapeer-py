@@ -9,13 +9,13 @@ Generate ``file_version_info.txt`` before building:
 block_cipher = None
 
 a = Analysis(
-    ["scrapeer_cli.py"],
-    pathex=["."],
+    ["src/scrapeer/__main__.py"],
+    pathex=["src"],
     binaries=[],
     datas=[
         ("pyproject.toml", "."),
     ],
-    hiddenimports=["scrapeer"],
+    hiddenimports=["scrapeer", "scrapeer.cli"],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

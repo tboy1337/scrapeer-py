@@ -129,14 +129,16 @@ scrapeer INFOHASH \
 
 ## Package Structure
 
-Scrapeer-py is organized into the following modules:
+Scrapeer-py uses a standard Python `src` layout:
 
-- `scrapeer/` - Main package directory
+- `src/scrapeer/` - Main package directory
   - `__init__.py` - Package initialization that exports the Scraper class
+  - `cli.py` - Command-line interface module
   - `scraper.py` - Main Scraper class implementation
   - `http.py` - HTTP(S) protocol scraping functionality
   - `udp.py` - UDP protocol scraping functionality
   - `utils.py` - Utility functions used across the package
+  - `config.py` - Configuration and logging setup
 
 ## API Reference
 

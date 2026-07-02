@@ -1,6 +1,6 @@
 [run]
 # Source directories to measure coverage for
-source = scrapeer, scrapeer_cli
+source = scrapeer
 
 # Exclude patterns for files to ignore
 omit = 

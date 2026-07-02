@@ -18,7 +18,12 @@ def _pyproject_path() -> Path:
         bundled = Path(meipass) / "pyproject.toml"
         if bundled.is_file():
             return bundled
-    return Path(__file__).resolve().parent.parent / "pyproject.toml"
+    start = Path(__file__).resolve().parent
+    for directory in (start, *start.parents):
+        candidate = directory / "pyproject.toml"
+        if candidate.is_file():
+            return candidate
+    return start.parent.parent / "pyproject.toml"
 
 
 @lru_cache(maxsize=1)

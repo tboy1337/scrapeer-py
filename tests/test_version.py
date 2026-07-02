@@ -42,6 +42,16 @@ class TestVersion:
         with patch("scrapeer._version._pyproject_path", return_value=pyproject):
             assert _fallback_version() == "unknown"
 
+    def test_pyproject_path_walk_up_fallback(self, tmp_path: Path) -> None:
+        """Test fallback path when no pyproject.toml exists in ancestor directories."""
+        isolated = tmp_path / "deep" / "nested"
+        isolated.mkdir(parents=True)
+        fake_module = isolated / "_version.py"
+        fake_module.touch()
+        with patch("scrapeer._version.__file__", str(fake_module)):
+            result = _pyproject_path()
+            assert result == isolated.parent.parent / "pyproject.toml"
+
     def test_pyproject_path_frozen_bundle(self, tmp_path: Path) -> None:
         """Test bundled pyproject path when running as a frozen executable."""
         bundled = tmp_path / "pyproject.toml"
