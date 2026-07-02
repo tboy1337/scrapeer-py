@@ -3,17 +3,18 @@
 import socket
 import urllib.error
 import urllib.request
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
+from scrapeer.config import get_user_agent
 from scrapeer.http import (
-    scrape_http,
-    http_query,
-    http_request,
+    get_information,
     http_announce,
     http_data,
-    get_information,
+    http_query,
+    http_request,
+    scrape_http,
     validate_network_params,
 )
 
@@ -32,7 +33,13 @@ class TestScrapeHttp:
             }
 
             result = scrape_http(
-                ["hash1"], "http", "example.com", 80, "/passkey", announce=True, timeout=5
+                ["hash1"],
+                "http",
+                "example.com",
+                80,
+                "/passkey",
+                announce=True,
+                timeout=5,
             )
 
             mock_announce.assert_called_once_with(
@@ -58,7 +65,13 @@ class TestScrapeHttp:
             }
 
             result = scrape_http(
-                ["hash1"], "http", "example.com", 80, "/passkey", announce=False, timeout=5
+                ["hash1"],
+                "http",
+                "example.com",
+                80,
+                "/passkey",
+                announce=False,
+                timeout=5,
             )
 
             mock_query.assert_called_once_with(
@@ -86,7 +99,13 @@ class TestScrapeHttp:
 
             with pytest.raises(Exception, match="Data parsing failed"):
                 scrape_http(
-                    ["hash1"], "http", "example.com", 80, "/passkey", announce=False, timeout=5
+                    ["hash1"],
+                    "http",
+                    "example.com",
+                    80,
+                    "/passkey",
+                    announce=False,
+                    timeout=5,
                 )
 
 
@@ -122,11 +141,7 @@ class TestHttpQuery:
     def test_no_passkey(self) -> None:
         """Test query building without passkey."""
         result = http_query(
-            ["a1b2c3d4e5f6789012345678901234567890abcd"],
-            "http",
-            "example.com",
-            80,
-            ""
+            ["a1b2c3d4e5f6789012345678901234567890abcd"], "http", "example.com", 80, ""
         )
         expected = (
             "http://example.com:80/scrape?info_hash="
@@ -179,7 +194,7 @@ class TestHttpRequest:
         args, _ = mock_urlopen.call_args
         request_obj = args[0]
         assert hasattr(request_obj, "headers")
-        assert request_obj.headers.get("User-agent") == "Scrapeer-py/1.0.0"
+        assert request_obj.headers.get("User-agent") == get_user_agent()
 
     @patch("socket.setdefaulttimeout")
     @patch("urllib.request.urlopen")
@@ -390,7 +405,6 @@ class TestHttpData:
             http_data(response, hashes, "example.com")
 
 
-
 class TestGetInformation:
     """Tests for get_information function."""
 
@@ -477,7 +491,9 @@ class TestValidateNetworkParams:
 
     def test_timeout_too_low(self) -> None:
         """Test with timeout too low."""
-        with pytest.raises(ValueError, match="Invalid timeout 0, must be positive integer"):
+        with pytest.raises(
+            ValueError, match="Invalid timeout 0, must be positive integer"
+        ):
             validate_network_params("example.com", 80, 0)
 
 
@@ -491,14 +507,16 @@ class TestScrapeHttpValidation:
 
     def test_invalid_protocol(self) -> None:
         """Test with invalid protocol."""
-        with pytest.raises(ValueError, match="Invalid protocol 'ftp', must be 'http' or 'https'"):
+        with pytest.raises(
+            ValueError, match="Invalid protocol 'ftp', must be 'http' or 'https'"
+        ):
             scrape_http(
                 ["a1b2c3d4e5f6789012345678901234567890abcd"],
                 "ftp",
                 "example.com",
                 80,
                 "",
-                announce=False
+                announce=False,
             )
 
 
@@ -508,10 +526,12 @@ class TestHttpDataEdgeCases:
     def test_unicode_decode_error_fallback(self) -> None:
         """Test fallback to latin-1 when utf-8 decoding fails."""
         # Create bytes that will cause UnicodeDecodeError in utf-8
-        response = b'\xff\xfe' + b"d8:completei1e10:incompletei2e"
+        response = b"\xff\xfe" + b"d8:completei1e10:incompletei2e"
         hashes = ["746573745f686173685f686572655f31365f6279"]
         # This should raise an exception since the malformed data won't match patterns
-        with pytest.raises(ValueError, match="Invalid scrape response from 'example.com'"):
+        with pytest.raises(
+            ValueError, match="Invalid scrape response from 'example.com'"
+        ):
             http_data(response, hashes, "example.com")
 
     def test_hex_decode_fallback(self) -> None:

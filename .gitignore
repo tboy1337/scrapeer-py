@@ -27,6 +27,8 @@ wheels/
 # PyInstaller
 *.manifest
 *.spec
+!scrapeer.spec
+file_version_info.txt
 
 # Installer logs
 pip-log.txt
@@ -123,4 +125,6 @@ Thumbs.db
 
 # Project specific
 pylint_output*.txt
-.pylint.d/ 
+pylint-report.txt
+pylint-output.txt
+.pylint.d/

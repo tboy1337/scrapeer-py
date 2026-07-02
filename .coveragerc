@@ -1,6 +1,6 @@
 [run]
 # Source directories to measure coverage for
-source = scrapeer
+source = scrapeer, scrapeer_cli
 
 # Exclude patterns for files to ignore
 omit = 
@@ -91,7 +91,7 @@ partial_branches =
     if False:
 
 # Fail under this coverage percentage
-fail_under = 85
+fail_under = 100
 
 [html]
 # Directory for HTML output

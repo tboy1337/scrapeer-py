@@ -6,11 +6,11 @@ import logging
 import random
 import socket
 import struct
-from typing import Dict, List, Tuple
 from dataclasses import dataclass
+from typing import Dict, List, Tuple
 
-from .utils import random_peer_id, collect_info_hash
 from .http import validate_network_params
+from .utils import collect_info_hash, random_peer_id
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -39,7 +39,9 @@ def scrape_udp(
         raise ValueError("Infohashes list cannot be empty.")
 
     validate_network_params(host, port, timeout)
-    logger.debug("Starting UDP %s for %s:%d", 'announce' if announce else 'scrape', host, port)
+    logger.debug(
+        "Starting UDP %s for %s:%d", "announce" if announce else "scrape", host, port
+    )
 
     socket_obj, ip = prepare_udp(host, port)
     socket_obj.settimeout(timeout)
@@ -51,27 +53,34 @@ def scrape_udp(
 
         if announce:
             logger.debug("Sending UDP announce for %d hash(es)", len(infohashes))
-            result: Dict[str, Dict[str, int]] = udp_announce(socket_obj, infohashes, connection_id)
+            result: Dict[str, Dict[str, int]] = udp_announce(
+                socket_obj, infohashes, connection_id
+            )
         else:
             logger.debug("Sending UDP scrape for %d hash(es)", len(infohashes))
             result = udp_scrape(
-                socket_obj, infohashes, connection_id, transaction_id, host=host, port=port
+                socket_obj,
+                infohashes,
+                connection_id,
+                transaction_id,
+                host=host,
+                port=port,
             )
 
         logger.info(
             "UDP %s successful: %d results from %s",
-            'announce' if announce else 'scrape',
+            "announce" if announce else "scrape",
             len(result),
-            host
+            host,
         )
         return result
     except Exception as e:
         logger.error(
             "UDP %s failed for %s:%d: %s",
-            'announce' if announce else 'scrape',
+            "announce" if announce else "scrape",
             host,
             port,
-            str(e)
+            str(e),
         )
         raise
     finally:
@@ -115,7 +124,9 @@ def udp_create_connection(host: str, port: int) -> socket.socket:
         socket_obj.connect((host, port))
         return socket_obj
     except socket.error as e:
-        raise ConnectionError(f"Failed to create socket for '{host}:{port}' - {str(e)}.") from e
+        raise ConnectionError(
+            f"Failed to create socket for '{host}:{port}' - {str(e)}."
+        ) from e
 
 
 def udp_connection_request(socket_obj: socket.socket) -> Tuple[int, int]:
@@ -190,7 +201,7 @@ def udp_scrape(
     transaction_id: int,
     *,
     host: str,
-    port: int
+    port: int,
 ) -> Dict[str, Dict[str, int]]:
     """
     Sends a scrape request
@@ -243,13 +254,18 @@ def udp_scrape(
             keys.append(infohash)
 
         # Parse results
-        return udp_scrape_data(response, hashes, host, keys, start=8, end=len(response), offset=12)
+        return udp_scrape_data(
+            response, hashes, host, keys, start=8, end=len(response), offset=12
+        )
     except socket.error as e:
         raise ConnectionError(f"Socket error from '{host}:{port}' - {str(e)}.") from e
 
 
 def udp_scrape_request(
-    socket_obj: socket.socket, hashes: List[str], connection_id: int, transaction_id: int
+    socket_obj: socket.socket,
+    hashes: List[str],
+    connection_id: int,
+    transaction_id: int,
 ) -> bytes:
     """
     Creates a scrape request
@@ -276,6 +292,7 @@ def udp_scrape_request(
 @dataclass
 class UdpAnnounceParams:
     """Parameters for UDP announce request."""
+
     action: int = 1  # Action (1 = announce)
     downloaded: int = 0
     left: int = 0
@@ -341,7 +358,9 @@ def udp_announce(
         raise ConnectionError(f"Failed to send announce request - {str(e)}.") from e
 
 
-def udp_verify_announce(socket_obj: socket.socket, transaction_id: int) -> Tuple[int, int, int]:
+def udp_verify_announce(
+    socket_obj: socket.socket, transaction_id: int
+) -> Tuple[int, int, int]:
     """
     Verifies an announce response
 
@@ -388,7 +407,7 @@ def udp_scrape_data(
     *,
     start: int,
     end: int,
-    offset: int
+    offset: int,
 ) -> Dict[str, Dict[str, int]]:
     """
     Parses scrape response
@@ -414,21 +433,17 @@ def udp_scrape_data(
     # Parse each hash
     for i, _ in enumerate(hashes):
         pos: int = start + (i * offset)
+        seeders: int
+        completed: int
+        leechers: int
+        seeders, completed, leechers = struct.unpack(  # type: ignore[misc]
+            ">III", response[pos : pos + 12]
+        )
 
-        if pos + 12 <= end:
-            seeders: int
-            completed: int
-            leechers: int
-            seeders, completed, leechers = struct.unpack(  # type: ignore[misc]
-                ">III", response[pos : pos + 12]
-            )
-
-            results[keys[i]] = {
-                "seeders": seeders,
-                "completed": completed,
-                "leechers": leechers,
-            }
-        else:
-            raise ValueError(f"Invalid scrape response from '{host}'.")
+        results[keys[i]] = {
+            "seeders": seeders,
+            "completed": completed,
+            "leechers": leechers,
+        }
 
     return results

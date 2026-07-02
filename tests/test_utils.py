@@ -2,15 +2,15 @@
 
 import binascii
 from typing import List
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from scrapeer.utils import (
-    normalize_infohashes,
-    get_passkey,
-    random_peer_id,
     collect_info_hash,
+    get_passkey,
+    normalize_infohashes,
+    random_peer_id,
 )
 
 
@@ -55,9 +55,7 @@ class TestNormalizeInfohashes:
         errors: List[str] = []
         hash_str = "a1b2c3d4e5f6789012345678901234567890abc"  # 39 chars
 
-        with pytest.raises(
-            ValueError, match="No valid infohashes found \\(0 valid\\)"
-        ):
+        with pytest.raises(ValueError, match="No valid infohashes found \\(0 valid\\)"):
             normalize_infohashes(hash_str, errors)
 
         assert len(errors) == 1
@@ -68,9 +66,7 @@ class TestNormalizeInfohashes:
         errors: List[str] = []
         hash_str = "a1b2c3d4e5f6789012345678901234567890abcde"  # 41 chars
 
-        with pytest.raises(
-            ValueError, match="No valid infohashes found \\(0 valid\\)"
-        ):
+        with pytest.raises(ValueError, match="No valid infohashes found \\(0 valid\\)"):
             normalize_infohashes(hash_str, errors)
 
         assert len(errors) == 1
@@ -81,9 +77,7 @@ class TestNormalizeInfohashes:
         errors: List[str] = []
         hash_str = "g1b2c3d4e5f6789012345678901234567890abcd"  # contains 'g'
 
-        with pytest.raises(
-            ValueError, match="No valid infohashes found \\(0 valid\\)"
-        ):
+        with pytest.raises(ValueError, match="No valid infohashes found \\(0 valid\\)"):
             normalize_infohashes(hash_str, errors)
 
         assert len(errors) == 1
@@ -110,9 +104,7 @@ class TestNormalizeInfohashes:
         """Test with empty list."""
         errors: List[str] = []
 
-        with pytest.raises(
-            ValueError, match="No valid infohashes found \\(0 valid\\)"
-        ):
+        with pytest.raises(ValueError, match="No valid infohashes found \\(0 valid\\)"):
             normalize_infohashes([], errors)
 
     def test_too_many_hashes(self) -> None:
@@ -149,7 +141,9 @@ class TestNormalizeInfohashes:
     def test_invalid_type_infohashes(self) -> None:
         """Test with invalid type for infohashes."""
         errors: List[str] = []
-        with pytest.raises(TypeError, match="Infohashes must be a string or list, got int"):
+        with pytest.raises(
+            TypeError, match="Infohashes must be a string or list, got int"
+        ):
             normalize_infohashes(123, errors)  # type: ignore
 
     def test_empty_infohash_in_list(self) -> None:
@@ -159,13 +153,14 @@ class TestNormalizeInfohashes:
             [
                 "a1b2c3d4e5f6789012345678901234567890abcd",
                 "",
-                "b2c3d4e5f6789012345678901234567890abcdef"
+                "b2c3d4e5f6789012345678901234567890abcdef",
             ],
-            errors
+            errors,
         )
 
         assert result == [
-            "a1b2c3d4e5f6789012345678901234567890abcd", "b2c3d4e5f6789012345678901234567890abcdef"
+            "a1b2c3d4e5f6789012345678901234567890abcd",
+            "b2c3d4e5f6789012345678901234567890abcdef",
         ]
         assert "Empty info hash skipped." in errors
 

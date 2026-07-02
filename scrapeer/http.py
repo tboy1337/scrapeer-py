@@ -9,6 +9,8 @@ import urllib.parse
 import urllib.request
 from typing import Dict, List, Optional
 
+from .config import get_user_agent
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -16,12 +18,12 @@ logger = logging.getLogger(__name__)
 def validate_network_params(host: str, port: int, timeout: int) -> None:
     """
     Validate common network parameters.
-    
+
     Args:
         host: Host address to validate
-        port: Port number to validate  
+        port: Port number to validate
         timeout: Timeout value to validate
-        
+
     Raises:
         ValueError: If any parameter is invalid
     """
@@ -70,12 +72,16 @@ def scrape_http(
         raise ValueError(f"Invalid protocol '{protocol}', must be 'http' or 'https'.")
 
     validate_network_params(host, port, timeout)
-    logger.debug("Starting HTTP%s scrape for %s", 'S' if protocol == 'https' else '', host)
+    logger.debug(
+        "Starting HTTP%s scrape for %s", "S" if protocol == "https" else "", host
+    )
 
     try:
         if announce:
             logger.debug("Using announce method for %d hash(es)", len(infohashes))
-            response = http_announce(infohashes, protocol, host, port, passkey, timeout=timeout)
+            response = http_announce(
+                infohashes, protocol, host, port, passkey, timeout=timeout
+            )
         else:
             logger.debug("Using scrape method for %d hash(es)", len(infohashes))
             query = http_query(infohashes, protocol, host, port, passkey)
@@ -89,7 +95,9 @@ def scrape_http(
         raise
 
 
-def http_query(infohashes: List[str], protocol: str, host: str, port: int, passkey: str) -> str:
+def http_query(
+    infohashes: List[str], protocol: str, host: str, port: int, passkey: str
+) -> str:
     """
     Builds the HTTP(S) query
 
@@ -137,9 +145,9 @@ def http_request(query: str, host: str, port: int, timeout: int) -> bytes:
 
     try:
         request = urllib.request.Request(
-            query, headers={"User-Agent": "Scrapeer-py/1.0.0"}
+            query, headers={"User-Agent": get_user_agent()}
         )
-        with urllib.request.urlopen(request) as urlfile:  # type: ignore[misc]
+        with urllib.request.urlopen(request) as urlfile:  # type: ignore[misc]  # nosec B310
             response: bytes = urlfile.read()  # type: ignore[misc]
         return response
     except Exception as e:
@@ -147,7 +155,13 @@ def http_request(query: str, host: str, port: int, timeout: int) -> bytes:
 
 
 def http_announce(
-    infohashes: List[str], protocol: str, host: str, port: int, passkey: str, *, timeout: int = 2
+    infohashes: List[str],
+    protocol: str,
+    host: str,
+    port: int,
+    passkey: str,
+    *,
+    timeout: int = 2,
 ) -> bytes:
     """
     Announces to the tracker instead of scraping
@@ -181,16 +195,18 @@ def http_announce(
 
     try:
         request = urllib.request.Request(
-            query, headers={"User-Agent": "Scrapeer-py/1.0.0"}
+            query, headers={"User-Agent": get_user_agent()}
         )
-        with urllib.request.urlopen(request) as urlfile:  # type: ignore[misc]
+        with urllib.request.urlopen(request) as urlfile:  # type: ignore[misc]  # nosec B310
             response: bytes = urlfile.read()  # type: ignore[misc]
         return response
     except Exception as e:
         raise ConnectionError(f"Connection error: {host}:{port} - {str(e)}") from e
 
 
-def http_data(response: bytes, infohashes: List[str], host: str) -> Dict[str, Dict[str, int]]:  # pylint: disable=too-many-locals
+def http_data(  # pylint: disable=too-many-locals
+    response: bytes, infohashes: List[str], host: str
+) -> Dict[str, Dict[str, int]]:
     """
     Gets the data from HTTP(S) response
 
@@ -204,9 +220,9 @@ def http_data(response: bytes, infohashes: List[str], host: str) -> Dict[str, Di
     """
     # Convert bytes to string, handling encoding issues
     try:
-        data = response.decode('utf-8', errors='replace')
+        data = response.decode("utf-8")
     except UnicodeDecodeError:
-        data = response.decode('latin-1', errors='replace')
+        data = response.decode("latin-1", errors="replace")
     results: Dict[str, Dict[str, int]] = {}
     pattern_all = r"d8:completei(\d+)e10:downloadedi(\d+)e10:incompletei(\d+)e"
     pattern_single = r"d8:completei(\d+)e10:incompletei(\d+)e"
@@ -236,7 +252,9 @@ def http_data(response: bytes, infohashes: List[str], host: str) -> Dict[str, Di
 
                 if info:
                     try:
-                        infohash_bytes = bytes.fromhex(infohash).decode('latin-1', errors='ignore')
+                        infohash_bytes = bytes.fromhex(infohash).decode(
+                            "latin-1", errors="ignore"
+                        )
                     except ValueError:
                         infohash_bytes = infohash
                     pattern = f"20:{infohash_bytes}d"
@@ -247,13 +265,21 @@ def http_data(response: bytes, infohashes: List[str], host: str) -> Dict[str, Di
                         end = info.find("e")
                         info = info[: end + 1]
 
-                        seeders_match = re.search(r"completei(\d+)e", info, re.IGNORECASE)
-                        leechers_match = re.search(r"incompletei(\d+)e", info, re.IGNORECASE)
-                        completed_match = re.search(r"downloadedi(\d+)e", info, re.IGNORECASE)
+                        seeders_match = re.search(
+                            r"completei(\d+)e", info, re.IGNORECASE
+                        )
+                        leechers_match = re.search(
+                            r"incompletei(\d+)e", info, re.IGNORECASE
+                        )
+                        completed_match = re.search(
+                            r"downloadedi(\d+)e", info, re.IGNORECASE
+                        )
 
                         seeders = int(seeders_match.group(1)) if seeders_match else 0
                         leechers = int(leechers_match.group(1)) if leechers_match else 0
-                        completed = int(completed_match.group(1)) if completed_match else 0
+                        completed = (
+                            int(completed_match.group(1)) if completed_match else 0
+                        )
 
                         results[infohash] = {
                             "seeders": seeders,

@@ -4,11 +4,12 @@ import json
 import subprocess
 import sys
 from io import StringIO
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 import scrapeer_cli
+from scrapeer._version import get_version
 
 
 class TestCliMain:
@@ -19,7 +20,8 @@ class TestCliMain:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
+            "-t",
+            "udp://tracker.example.com:80",
         ]
 
         mock_scraper = MagicMock()
@@ -27,7 +29,7 @@ class TestCliMain:
             "a1b2c3d4e5f6789012345678901234567890abcd": {
                 "seeders": 10,
                 "leechers": 5,
-                "completed": 2
+                "completed": 2,
             }
         }
         mock_scraper.has_errors.return_value = False
@@ -51,8 +53,9 @@ class TestCliMain:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
-            "--json"
+            "-t",
+            "udp://tracker.example.com:80",
+            "--json",
         ]
 
         mock_scraper = MagicMock()
@@ -60,7 +63,7 @@ class TestCliMain:
             "a1b2c3d4e5f6789012345678901234567890abcd": {
                 "seeders": 10,
                 "leechers": 5,
-                "completed": 2
+                "completed": 2,
             }
         }
         mock_scraper.has_errors.return_value = False
@@ -87,13 +90,17 @@ class TestCliMain:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
+            "-t",
+            "udp://tracker.example.com:80",
         ]
 
         mock_scraper = MagicMock()
         mock_scraper.scrape.return_value = {}
         mock_scraper.has_errors.return_value = True
-        mock_scraper.get_errors.return_value = ["Connection timeout", "Invalid response"]
+        mock_scraper.get_errors.return_value = [
+            "Connection timeout",
+            "Invalid response",
+        ]
 
         with patch("sys.argv", test_args):
             with patch("scrapeer_cli.Scraper", return_value=mock_scraper):
@@ -113,8 +120,9 @@ class TestCliMain:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
-            "--quiet"
+            "-t",
+            "udp://tracker.example.com:80",
+            "--quiet",
         ]
 
         mock_scraper = MagicMock()
@@ -131,14 +139,17 @@ class TestCliMain:
                     assert exc_info.value.code == 1
                     output = mock_stdout.getvalue()
                     assert "No results found." in output
-                    assert "Errors" not in output  # Should not show errors in quiet mode
+                    assert (
+                        "Errors" not in output
+                    )  # Should not show errors in quiet mode
 
     def test_main_keyboard_interrupt(self) -> None:
         """Test main function handles keyboard interrupt."""
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
+            "-t",
+            "udp://tracker.example.com:80",
         ]
 
         mock_scraper = MagicMock()
@@ -150,7 +161,9 @@ class TestCliMain:
                     with pytest.raises(SystemExit) as exc_info:
                         scrapeer_cli.main()
 
-                    assert exc_info.value.code == 130  # Standard keyboard interrupt exit code
+                    assert (
+                        exc_info.value.code == 130
+                    )  # Standard keyboard interrupt exit code
                     output = mock_stderr.getvalue()
                     assert "Operation cancelled by user." in output
 
@@ -159,8 +172,9 @@ class TestCliMain:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
-            "--quiet"
+            "-t",
+            "udp://tracker.example.com:80",
+            "--quiet",
         ]
 
         mock_scraper = MagicMock()
@@ -181,7 +195,8 @@ class TestCliMain:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
+            "-t",
+            "udp://tracker.example.com:80",
         ]
 
         mock_scraper = MagicMock()
@@ -202,8 +217,9 @@ class TestCliMain:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
-            "--quiet"
+            "-t",
+            "udp://tracker.example.com:80",
+            "--quiet",
         ]
 
         mock_scraper = MagicMock()
@@ -228,7 +244,8 @@ class TestCliValidation:
         test_args = [
             "scrapeer_cli.py",
             "abc123",  # Too short
-            "-t", "udp://tracker.example.com:80",
+            "-t",
+            "udp://tracker.example.com:80",
         ]
 
         with patch("sys.argv", test_args):
@@ -246,7 +263,8 @@ class TestCliValidation:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcdef",  # Too long (41 chars)
-            "-t", "udp://tracker.example.com:80",
+            "-t",
+            "udp://tracker.example.com:80",
         ]
 
         with patch("sys.argv", test_args):
@@ -263,7 +281,8 @@ class TestCliValidation:
         test_args = [
             "scrapeer_cli.py",
             "g1h2i3j4k5l6789012345678901234567890abcd",  # Contains g,h,i,j,k,l
-            "-t", "udp://tracker.example.com:80",
+            "-t",
+            "udp://tracker.example.com:80",
         ]
 
         with patch("sys.argv", test_args):
@@ -280,8 +299,9 @@ class TestCliValidation:
         test_args = [
             "scrapeer_cli.py",
             "invalid",
-            "-t", "udp://tracker.example.com:80",
-            "--quiet"
+            "-t",
+            "udp://tracker.example.com:80",
+            "--quiet",
         ]
 
         with patch("sys.argv", test_args):
@@ -298,8 +318,10 @@ class TestCliValidation:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
-            "--timeout", "0"
+            "-t",
+            "udp://tracker.example.com:80",
+            "--timeout",
+            "0",
         ]
 
         with patch("sys.argv", test_args):
@@ -316,8 +338,10 @@ class TestCliValidation:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
-            "--timeout", "301"
+            "-t",
+            "udp://tracker.example.com:80",
+            "--timeout",
+            "301",
         ]
 
         with patch("sys.argv", test_args):
@@ -334,9 +358,11 @@ class TestCliValidation:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
-            "--timeout", "0",
-            "--quiet"
+            "-t",
+            "udp://tracker.example.com:80",
+            "--timeout",
+            "0",
+            "--quiet",
         ]
 
         with patch("sys.argv", test_args):
@@ -358,7 +384,8 @@ class TestCliArguments:
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
             "b2c3d4e5f6789012345678901234567890abcdef",
-            "-t", "udp://tracker.example.com:80",
+            "-t",
+            "udp://tracker.example.com:80",
         ]
 
         mock_scraper = MagicMock()
@@ -374,15 +401,23 @@ class TestCliArguments:
                 mock_scraper.scrape.assert_called_once()
                 call_args = mock_scraper.scrape.call_args
                 assert len(call_args.kwargs["hashes"]) == 2
-                assert "a1b2c3d4e5f6789012345678901234567890abcd" in call_args.kwargs["hashes"]
-                assert "b2c3d4e5f6789012345678901234567890abcdef" in call_args.kwargs["hashes"]
+                assert (
+                    "a1b2c3d4e5f6789012345678901234567890abcd"
+                    in call_args.kwargs["hashes"]
+                )
+                assert (
+                    "b2c3d4e5f6789012345678901234567890abcdef"
+                    in call_args.kwargs["hashes"]
+                )
 
     def test_multiple_trackers(self) -> None:
         """Test CLI with multiple trackers."""
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker1.example.com:80", "udp://tracker2.example.com:80",
+            "-t",
+            "udp://tracker1.example.com:80",
+            "udp://tracker2.example.com:80",
         ]
 
         mock_scraper = MagicMock()
@@ -405,8 +440,9 @@ class TestCliArguments:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
-            "--announce"
+            "-t",
+            "udp://tracker.example.com:80",
+            "--announce",
         ]
 
         mock_scraper = MagicMock()
@@ -427,8 +463,10 @@ class TestCliArguments:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
-            "--max-trackers", "5"
+            "-t",
+            "udp://tracker.example.com:80",
+            "--max-trackers",
+            "5",
         ]
 
         mock_scraper = MagicMock()
@@ -449,8 +487,10 @@ class TestCliArguments:
         test_args = [
             "scrapeer_cli.py",
             "a1b2c3d4e5f6789012345678901234567890abcd",
-            "-t", "udp://tracker.example.com:80",
-            "--timeout", "10"
+            "-t",
+            "udp://tracker.example.com:80",
+            "--timeout",
+            "10",
         ]
 
         mock_scraper = MagicMock()
@@ -478,7 +518,7 @@ class TestCliIntegration:
             capture_output=True,
             text=True,
             timeout=5,
-            check=False
+            check=False,
         )
 
         assert result.returncode == 0
@@ -496,11 +536,11 @@ class TestCliIntegration:
             capture_output=True,
             text=True,
             timeout=5,
-            check=False
+            check=False,
         )
 
         assert result.returncode == 0
-        assert "Scrapeer-py 1.0.11" in result.stdout
+        assert f"Scrapeer-py {get_version()}" in result.stdout
 
     @pytest.mark.timeout(10)
     def test_cli_missing_required_args(self) -> None:
@@ -510,7 +550,7 @@ class TestCliIntegration:
             capture_output=True,
             text=True,
             timeout=5,
-            check=False
+            check=False,
         )
 
         assert result.returncode == 2  # argparse error code
@@ -520,11 +560,15 @@ class TestCliIntegration:
     def test_cli_missing_trackers(self) -> None:
         """Test CLI with missing trackers argument."""
         result = subprocess.run(
-            [sys.executable, "scrapeer_cli.py", "a1b2c3d4e5f6789012345678901234567890abcd"],
+            [
+                sys.executable,
+                "scrapeer_cli.py",
+                "a1b2c3d4e5f6789012345678901234567890abcd",
+            ],
             capture_output=True,
             text=True,
             timeout=5,
-            check=False
+            check=False,
         )
 
         assert result.returncode == 2

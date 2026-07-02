@@ -2,13 +2,15 @@
 Utility functions for Scrapeer.
 """
 
-import re
-import random
 import binascii
-from typing import List, Union, Optional, Match
+import random
+import re
+from typing import List, Optional, Union
 
 
-def normalize_infohashes(infohashes: Union[str, List[str]], errors: List[str]) -> List[str]:
+def normalize_infohashes(
+    infohashes: Union[str, List[str]], errors: List[str]
+) -> List[str]:
     """
     Normalizes the given hashes
 
@@ -27,7 +29,9 @@ def normalize_infohashes(infohashes: Union[str, List[str]], errors: List[str]) -
         raise ValueError("Infohashes cannot be None.")
 
     if not isinstance(infohashes, (list, str)):
-        raise TypeError(f"Infohashes must be a string or list, got {type(infohashes).__name__}.")
+        raise TypeError(
+            f"Infohashes must be a string or list, got {type(infohashes).__name__}."
+        )
 
     if isinstance(infohashes, str):
         infohashes = [infohashes]
@@ -65,10 +69,11 @@ def get_passkey(path: Optional[str]) -> str:
     Returns:
         str: Passkey or empty string.
     """
-    if path and re.search(r"[a-z0-9]{32}", path, re.IGNORECASE):
-        matches: Optional[Match[str]] = re.search(r"[a-z0-9]{32}", path, re.IGNORECASE)
-        if matches:
-            return f"/{matches.group(0)}"
+    if not path:
+        return ""
+    match = re.search(r"[a-z0-9]{32}", path, re.IGNORECASE)
+    if match:
+        return f"/{match.group(0)}"
     return ""
 
 

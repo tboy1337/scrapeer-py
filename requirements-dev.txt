@@ -1,6 +1,5 @@
 # Core Testing Packages
 pytest
-pytest-asyncio
 pytest-timeout
 pytest-xdist
 pytest-mock
@@ -11,5 +10,10 @@ pylint
 mypy
 
 # Code Formatting
+autopep8
 black
 isort
+
+# Security
+bandit
+pip-audit

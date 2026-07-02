@@ -9,55 +9,46 @@ import sys
 from typing import List, Optional
 
 from scrapeer import Scraper
+from scrapeer._version import get_version
+from scrapeer.config import get_default_timeout
 
 
 def main() -> None:  # pylint: disable=too-many-locals
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
         description="Scrape BitTorrent trackers for torrent information",
-        epilog="Example: %(prog)s abc123...def456 -t udp://tracker.example.com:80"
+        epilog="Example: %(prog)s abc123...def456 -t udp://tracker.example.com:80",
     )
     parser.add_argument(
-        "infohashes",
-        nargs="+",
-        help="One or more 40-character infohashes to scrape"
+        "infohashes", nargs="+", help="One or more 40-character infohashes to scrape"
     )
     parser.add_argument(
-        "-t", "--trackers",
+        "-t",
+        "--trackers",
         nargs="+",
         required=True,
-        help="One or more tracker URLs (UDP/HTTP/HTTPS)"
+        help="One or more tracker URLs (UDP/HTTP/HTTPS)",
     )
     parser.add_argument(
         "--timeout",
         type=int,
-        default=2,
-        help="Timeout in seconds for each tracker (default: 2)"
+        default=get_default_timeout(),
+        help="Timeout in seconds for each tracker (default: from config)",
     )
     parser.add_argument(
-        "--announce",
-        action="store_true",
-        help="Use announce instead of scrape"
+        "--announce", action="store_true", help="Use announce instead of scrape"
     )
     parser.add_argument(
-        "--max-trackers",
-        type=int,
-        help="Maximum number of trackers to scrape"
+        "--max-trackers", type=int, help="Maximum number of trackers to scrape"
     )
     parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output results in JSON format"
+        "--json", action="store_true", help="Output results in JSON format"
     )
     parser.add_argument(
-        "--quiet", "-q",
-        action="store_true",
-        help="Suppress error messages"
+        "--quiet", "-q", action="store_true", help="Suppress error messages"
     )
     parser.add_argument(
-        "--version",
-        action="version",
-        version="Scrapeer-py 1.0.11"
+        "--version", action="version", version=f"Scrapeer-py {get_version()}"
     )
 
     args = parser.parse_args()
@@ -71,11 +62,13 @@ def main() -> None:  # pylint: disable=too-many-locals
     json_output: bool = args.json
     quiet: bool = args.quiet
     for infohash in infohashes:
-        if len(infohash) != 40 or not all(c in '0123456789abcdefABCDEF' for c in infohash):
+        if len(infohash) != 40 or not all(
+            c in "0123456789abcdefABCDEF" for c in infohash
+        ):
             if not quiet:
                 print(
                     f"Error: Invalid infohash '{infohash}'. Must be 40 hex characters.",
-                    file=sys.stderr
+                    file=sys.stderr,
                 )
             sys.exit(1)
 
@@ -93,7 +86,7 @@ def main() -> None:  # pylint: disable=too-many-locals
             trackers=trackers,
             timeout=timeout,
             announce=announce,
-            max_trackers=max_trackers
+            max_trackers=max_trackers,
         )
 
         if json_output:
@@ -102,7 +95,7 @@ def main() -> None:  # pylint: disable=too-many-locals
                 "results": results,
                 "errors": scraper.get_errors() if scraper.has_errors() else [],
                 "total_hashes": len(infohashes),
-                "successful_hashes": len(results)
+                "successful_hashes": len(results),
             }
             print(json.dumps(output, indent=2))
         else:

@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from scrapeer._version import get_version
 from scrapeer.scraper import Scraper
 
 
@@ -17,7 +18,7 @@ class TestScraper:  # pylint: disable=too-many-public-methods
         assert not scraper.errors
         assert scraper.infohashes == []
         assert scraper.timeout == 2
-        assert scraper.VERSION == "1.0.0"
+        assert scraper.VERSION == get_version()
 
     def test_has_errors_empty(self) -> None:
         """Test has_errors when no errors."""
@@ -218,10 +219,18 @@ class TestScraper:  # pylint: disable=too-many-public-methods
         with patch("scrapeer.scraper.scrape_http") as mock_scrape_http:
             mock_scrape_http.return_value = {"hash1": {"seeders": 1}}
 
-            result = scraper.try_scrape("http", "example.com", None, "/passkey", announce=False)
+            result = scraper.try_scrape(
+                "http", "example.com", None, "/passkey", announce=False
+            )
 
             mock_scrape_http.assert_called_once_with(
-                ["hash1"], "http", "example.com", 80, "/passkey", announce=False, timeout=2
+                ["hash1"],
+                "http",
+                "example.com",
+                80,
+                "/passkey",
+                announce=False,
+                timeout=2,
             )
             assert result == {"hash1": {"seeders": 1}}
 
@@ -233,10 +242,18 @@ class TestScraper:  # pylint: disable=too-many-public-methods
         with patch("scrapeer.scraper.scrape_http") as mock_scrape_http:
             mock_scrape_http.return_value = {"hash1": {"seeders": 1}}
 
-            result = scraper.try_scrape("https", "example.com", None, "/passkey", announce=True)
+            result = scraper.try_scrape(
+                "https", "example.com", None, "/passkey", announce=True
+            )
 
             mock_scrape_http.assert_called_once_with(
-                ["hash1"], "https", "example.com", 443, "/passkey", announce=True, timeout=2
+                ["hash1"],
+                "https",
+                "example.com",
+                443,
+                "/passkey",
+                announce=True,
+                timeout=2,
             )
             assert result == {"hash1": {"seeders": 1}}
 
@@ -428,7 +445,7 @@ class TestScraper:  # pylint: disable=too-many-public-methods
             scraper.scrape(
                 ["a1b2c3d4e5f6789012345678901234567890abcd"],
                 ["http://example.com"],
-                announce="true"  # type: ignore
+                announce="true",  # type: ignore
             )
 
     def test_validation_invalid_max_trackers_type(self) -> None:
@@ -439,7 +456,7 @@ class TestScraper:  # pylint: disable=too-many-public-methods
             scraper.scrape(
                 ["a1b2c3d4e5f6789012345678901234567890abcd"],
                 ["http://example.com"],
-                max_trackers="5"  # type: ignore
+                max_trackers="5",  # type: ignore
             )
 
     def test_validation_invalid_max_trackers_value(self) -> None:
@@ -450,7 +467,7 @@ class TestScraper:  # pylint: disable=too-many-public-methods
             scraper.scrape(
                 ["a1b2c3d4e5f6789012345678901234567890abcd"],
                 ["http://example.com"],
-                max_trackers=0
+                max_trackers=0,
             )
 
     def test_validation_invalid_timeout_type(self) -> None:
@@ -461,7 +478,7 @@ class TestScraper:  # pylint: disable=too-many-public-methods
             scraper.scrape(
                 ["a1b2c3d4e5f6789012345678901234567890abcd"],
                 ["http://example.com"],
-                timeout="5"  # type: ignore
+                timeout="5",  # type: ignore
             )
 
     def test_validation_invalid_timeout_value_low(self) -> None:
@@ -472,18 +489,20 @@ class TestScraper:  # pylint: disable=too-many-public-methods
             scraper.scrape(
                 ["a1b2c3d4e5f6789012345678901234567890abcd"],
                 ["http://example.com"],
-                timeout=0
+                timeout=0,
             )
 
     def test_validation_invalid_timeout_value_high(self) -> None:
         """Test validation error for timeout too high."""
         scraper = Scraper()
 
-        with pytest.raises(ValueError, match="Timeout too large, max 300 seconds, got 301"):
+        with pytest.raises(
+            ValueError, match="Timeout too large, max 300 seconds, got 301"
+        ):
             scraper.scrape(
                 ["a1b2c3d4e5f6789012345678901234567890abcd"],
                 ["http://example.com"],
-                timeout=301
+                timeout=301,
             )
 
     def test_scraper_break_on_max_trackers_reached(self) -> None:

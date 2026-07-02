@@ -2,21 +2,21 @@
 
 import socket
 import struct
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from scrapeer.udp import (
-    scrape_udp,
     prepare_udp,
-    udp_create_connection,
+    scrape_udp,
+    udp_announce,
     udp_connection_request,
     udp_connection_response,
+    udp_create_connection,
     udp_scrape,
-    udp_scrape_request,
-    udp_announce,
-    udp_verify_announce,
     udp_scrape_data,
+    udp_scrape_request,
+    udp_verify_announce,
 )
 
 
@@ -564,7 +564,13 @@ class TestUdpScrapeData:
             Exception, match="Invalid scrape response from 'example.com'"
         ):
             udp_scrape_data(
-                response, hashes, "example.com", keys, start=8, end=len(response), offset=12
+                response,
+                hashes,
+                "example.com",
+                keys,
+                start=8,
+                end=len(response),
+                offset=12,
             )
 
     def test_partial_data(self) -> None:
@@ -580,7 +586,13 @@ class TestUdpScrapeData:
             Exception, match="Invalid scrape response from 'example.com'"
         ):
             udp_scrape_data(
-                response, hashes, "example.com", keys, start=8, end=len(response), offset=12
+                response,
+                hashes,
+                "example.com",
+                keys,
+                start=8,
+                end=len(response),
+                offset=12,
             )
 
     def test_insufficient_data_for_single_hash(self) -> None:
@@ -596,7 +608,13 @@ class TestUdpScrapeData:
             Exception, match="Invalid scrape response from 'example.com'"
         ):
             udp_scrape_data(
-                response, hashes, "example.com", keys, start=8, end=len(response), offset=12
+                response,
+                hashes,
+                "example.com",
+                keys,
+                start=8,
+                end=len(response),
+                offset=12,
             )
 
     def test_udp_scrape_data_insufficient_response(self) -> None:
@@ -613,7 +631,13 @@ class TestUdpScrapeData:
             Exception, match="Invalid scrape response from 'example.com'"
         ):
             udp_scrape_data(
-                response, hashes, "example.com", keys, start=8, end=len(response), offset=12
+                response,
+                hashes,
+                "example.com",
+                keys,
+                start=8,
+                end=len(response),
+                offset=12,
             )
 
 
@@ -631,7 +655,15 @@ class TestScrapeUdpValidation:
         hashes = ["a1b2c3d4e5f6789012345678901234567890abcd"]
         keys = ["a1b2c3d4e5f6789012345678901234567890abcd"]
 
-        with pytest.raises(ValueError, match="Invalid scrape response from 'example.com'"):
+        with pytest.raises(
+            ValueError, match="Invalid scrape response from 'example.com'"
+        ):
             udp_scrape_data(
-                response, hashes, "example.com", keys, start=0, end=len(response), offset=12
+                response,
+                hashes,
+                "example.com",
+                keys,
+                start=0,
+                end=len(response),
+                offset=12,
             )
